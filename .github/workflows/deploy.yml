@@ -1,0 +1,67 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout portfolio
+        uses: actions/checkout@v4
+        with:
+          path: bluebonnet-tech-portfolio
+
+      - name: Checkout core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/bluebonnet-tech-core
+          path: bluebonnet-tech-core
+          # NOTE: If bluebonnet-tech-core is private, replace with a PAT:
+          # token: ${{ secrets.CORE_REPO_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: bluebonnet-tech-portfolio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: bluebonnet-tech-portfolio
+        run: npm ci
+
+      - name: Build
+        working-directory: bluebonnet-tech-portfolio
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: bluebonnet-tech-portfolio/out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
