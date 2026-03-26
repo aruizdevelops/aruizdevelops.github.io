@@ -20,6 +20,7 @@ const nextConfig = {
     const resolve = (pkg) => path.resolve(__dirname, 'node_modules', pkg);
     config.resolve.alias = {
       ...config.resolve.alias,
+      '@mui/icons-material': resolve('@mui/icons-material'),
       '@mui/material': resolve('@mui/material'),
       '@mui/system': resolve('@mui/system'),
       '@mui/styled-engine': resolve('@mui/styled-engine'),
