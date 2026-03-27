@@ -92,6 +92,52 @@ export const PROJECTS = [
     secondaryColor: '#B8977E',
     demoUrl: 'https://aruizdevelops.github.io/bluebonnet-tech-tenant-sage-stone/',
   },
+  {
+    id: 'iron-oak-barbershop',
+    slug: 'iron-oak-barbershop',
+    nameKey: 'projects.ironoak.name',
+    summaryKey: 'projects.ironoak.summary',
+    appTypeKey: 'projects.ironoak.appType',
+    businessProblemKey: 'projects.ironoak.businessProblem',
+    overviewKey: 'projects.ironoak.overview',
+    challengeKey: 'projects.ironoak.challenge',
+    solutionKey: 'projects.ironoak.solution',
+    featureKeys: [
+      'projects.ironoak.feature1',
+      'projects.ironoak.feature2',
+      'projects.ironoak.feature3',
+      'projects.ironoak.feature4',
+      'projects.ironoak.feature5',
+      'projects.ironoak.feature6',
+    ],
+    techStack: ['Next.js', 'React', 'Material UI', 'Emotion', 'Playwright', '@bluebonnet-tech/core'],
+    designHighlightKeys: [
+      'projects.ironoak.design1',
+      'projects.ironoak.design2',
+    ],
+    mobileNotesKey: 'projects.ironoak.mobileNotes',
+    futureKeys: [
+      'projects.ironoak.future1',
+      'projects.ironoak.future2',
+      'projects.ironoak.future3',
+    ],
+    images: {
+      thumbnail: '/images/projects/iron-oak/thumbnail.png',
+      hero: '/images/projects/iron-oak/hero.png',
+      gallery: [
+        '/images/projects/iron-oak/landing.png',
+        '/images/projects/iron-oak/services.png',
+        '/images/projects/iron-oak/booking-service.png',
+        '/images/projects/iron-oak/booking-time.png',
+        '/images/projects/iron-oak/booking-confirm.png',
+        '/images/projects/iron-oak/confirmation.png',
+        '/images/projects/iron-oak/mobile.png',
+      ],
+    },
+    accentColor: '#C9A96E',
+    secondaryColor: '#F5E6D3',
+    demoUrl: 'https://aruizdevelops.github.io/bluebonnet-tech-tenant-barbershop/',
+  },
 ];
 
 export function getProjectBySlug(slug) {
