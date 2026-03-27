@@ -156,7 +156,7 @@ export function getFooter(t) {
       {
         title: t('footer.projectsTitle'),
         links: [
-          { label: 'Fruteria del Sol', href: '/projects/fruteria-del-sol' },
+          { label: 'Tropikala Smoothie Co.', href: '/projects/tropikala-smoothie' },
           { label: 'Sage & Stone Wellness', href: '/projects/sage-stone' },
         ],
       },

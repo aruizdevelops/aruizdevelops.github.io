@@ -3,7 +3,7 @@
  *
  * Usage:
  *   1. Start both tenant apps on different ports:
- *      - Fruteria del Sol:    cd ../bluebonnet-tech-tenant-demo && PORT=3001 npm run dev
+ *      - Tropikala Smoothie:  cd ../bluebonnet-tech-tenant-demo && PORT=3001 npm run dev
  *      - Sage & Stone:        cd ../bluebonnet-tech-tenant-sage-stone && PORT=3002 npm run dev
  *   2. Run this script:
  *      npm run capture-screenshots
@@ -12,47 +12,54 @@
 const { chromium } = require('playwright');
 const path = require('path');
 
-const FRUTERIA_BASE = process.env.FRUTERIA_URL || 'http://localhost:3001/bluebonnet-tech-tenant-demo';
+const TROPIKALA_BASE = process.env.TROPIKALA_URL || 'http://localhost:3001/bluebonnet-tech-tenant-demo';
 const SAGE_BASE = process.env.SAGE_URL || 'http://localhost:3002/bluebonnet-tech-tenant-sage-stone';
 
 const OUTPUT_DIR = path.resolve(__dirname, '../public/images/projects');
 
 const SCREENSHOTS = [
-  // Fruteria del Sol
+  // Tropikala Smoothie Co.
   {
-    url: FRUTERIA_BASE,
-    output: 'fruteria/landing.png',
+    url: TROPIKALA_BASE,
+    output: 'tropikala/landing.png',
     viewport: { width: 1440, height: 900 },
     fullPage: true,
-    label: 'Fruteria - Landing (Desktop)',
+    label: 'Tropikala - Landing (Desktop)',
   },
   {
-    url: `${FRUTERIA_BASE}/admin`,
-    output: 'fruteria/menu.png',
+    url: `${TROPIKALA_BASE}/menu`,
+    output: 'tropikala/menu.png',
     viewport: { width: 1440, height: 900 },
     fullPage: false,
-    label: 'Fruteria - Admin / Menu',
+    label: 'Tropikala - Menu',
   },
   {
-    url: FRUTERIA_BASE,
-    output: 'fruteria/mobile.png',
+    url: `${TROPIKALA_BASE}/admin`,
+    output: 'tropikala/admin.png',
+    viewport: { width: 1440, height: 900 },
+    fullPage: false,
+    label: 'Tropikala - Admin Dashboard',
+  },
+  {
+    url: TROPIKALA_BASE,
+    output: 'tropikala/mobile.png',
     viewport: { width: 390, height: 844 },
     fullPage: true,
-    label: 'Fruteria - Mobile',
+    label: 'Tropikala - Mobile',
   },
   {
-    url: FRUTERIA_BASE,
-    output: 'fruteria/thumbnail.png',
+    url: TROPIKALA_BASE,
+    output: 'tropikala/thumbnail.png',
     viewport: { width: 1440, height: 900 },
     fullPage: false,
-    label: 'Fruteria - Thumbnail',
+    label: 'Tropikala - Thumbnail',
   },
   {
-    url: FRUTERIA_BASE,
-    output: 'fruteria/hero.png',
+    url: TROPIKALA_BASE,
+    output: 'tropikala/hero.png',
     viewport: { width: 1440, height: 900 },
     fullPage: false,
-    label: 'Fruteria - Hero',
+    label: 'Tropikala - Hero',
   },
 
   // Sage & Stone Wellness
