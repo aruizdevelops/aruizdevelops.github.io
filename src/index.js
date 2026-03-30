@@ -36,7 +36,17 @@ export { useLocalStorage } from './hooks';
 export * from './constants';
 
 // Contracts
-export { validateTenantManifest, BUSINESS_TYPES, REQUIRED_MANIFEST_FIELDS } from './contracts';
+export {
+  validateTenantManifest,
+  BUSINESS_TYPES,
+  REQUIRED_MANIFEST_FIELDS,
+  BOOKING_STEPS,
+  DEFAULT_BOOKING_STEPS,
+  validateBookingConfig,
+  CHECKOUT_STEPS,
+  DEFAULT_CHECKOUT_STEPS,
+  validateCheckoutConfig,
+} from './contracts';
 
 // Utils
 export { sanitizeText, isSafeUrl, isValidTenantId } from './utils/security';
