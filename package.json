@@ -12,7 +12,8 @@
     "./components": "./src/components/index.js",
     "./providers": "./src/providers/index.js",
     "./hooks": "./src/hooks/index.js",
-    "./constants": "./src/constants/index.js"
+    "./constants": "./src/constants/index.js",
+    "./contracts": "./src/contracts/index.js"
   },
   "scripts": {
     "dev": "next dev",
