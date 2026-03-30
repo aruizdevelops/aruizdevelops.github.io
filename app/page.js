@@ -15,6 +15,7 @@ const componentGroups = [
     category: 'Layout',
     items: [
       { name: 'AppShell', status: 'active', description: 'Admin layout with sidebar + topbar' },
+      { name: 'LandingShell', status: 'active', description: 'Public-facing layout wrapper' },
     ],
   },
   {
@@ -43,6 +44,7 @@ const componentGroups = [
     category: 'Hooks',
     items: [
       { name: 'useLocalStorage', status: 'active', description: 'Persistent state in localStorage' },
+      { name: 'useStepperFlow', status: 'active', description: 'Step state management hook' },
     ],
   },
   {
@@ -61,13 +63,11 @@ const componentGroups = [
     ],
   },
   {
-    category: 'Planned',
+    category: 'Forms',
     items: [
-      { name: 'LandingShell', status: 'pending', description: 'Public-facing layout wrapper' },
-      { name: 'StepperFlow', status: 'pending', description: 'Multi-step workflow shell' },
-      { name: 'FormField', status: 'pending', description: 'Labeled input wrapper' },
-      { name: 'FormSection', status: 'pending', description: 'Fieldset grouping' },
-      { name: 'useStepperFlow', status: 'pending', description: 'Step state management hook' },
+      { name: 'StepperFlow', status: 'active', description: 'Multi-step workflow shell' },
+      { name: 'FormField', status: 'active', description: 'Labeled input wrapper' },
+      { name: 'FormSection', status: 'active', description: 'Fieldset grouping' },
     ],
   },
 ];
