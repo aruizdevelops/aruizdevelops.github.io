@@ -46,6 +46,21 @@ const componentGroups = [
     ],
   },
   {
+    category: 'Landing',
+    items: [
+      { name: 'Navigation', status: 'active', description: 'Responsive landing page navigation bar' },
+      { name: 'Hero', status: 'active', description: 'Hero section with headline and CTA' },
+      { name: 'Services', status: 'active', description: 'Services showcase grid' },
+      { name: 'About', status: 'active', description: 'About section with business info' },
+      { name: 'Benefits', status: 'active', description: 'Benefits highlight section' },
+      { name: 'Process', status: 'active', description: 'Step-by-step process section' },
+      { name: 'Testimonials', status: 'active', description: 'Customer testimonials carousel' },
+      { name: 'CtaBanner', status: 'active', description: 'Call-to-action banner section' },
+      { name: 'Footer', status: 'active', description: 'Landing page footer with links' },
+      { name: 'LandingPage', status: 'active', description: 'Full landing page composition' },
+    ],
+  },
+  {
     category: 'Planned',
     items: [
       { name: 'LandingShell', status: 'pending', description: 'Public-facing layout wrapper' },
