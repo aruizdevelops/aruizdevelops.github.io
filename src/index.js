@@ -15,6 +15,20 @@ export {
   AppShell,
 } from './components';
 
+// Landing
+export {
+  Navigation,
+  Hero,
+  Services,
+  About,
+  Benefits,
+  Process,
+  Testimonials,
+  CtaBanner,
+  Footer,
+  LandingPage,
+} from './components/landing';
+
 // Hooks
 export { useLocalStorage } from './hooks';
 
