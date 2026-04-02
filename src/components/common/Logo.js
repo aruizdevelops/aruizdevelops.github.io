@@ -1,10 +1,11 @@
 'use client';
 
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme } from '@mui/material';
 import { useTenant } from '../../providers/TenantProvider';
 
 export function Logo({ size = 'medium', ...props }) {
   const tenant = useTenant();
+  const theme = useTheme();
 
   const sizes = {
     small: { fontSize: '1rem', height: 28 },
@@ -26,13 +27,16 @@ export function Logo({ size = 'medium', ...props }) {
     );
   }
 
+  const gradientStart = theme.palette.primary.dark || theme.palette.primary.main;
+  const gradientEnd = theme.palette.primary.light || theme.palette.primary.main;
+
   return (
     <Typography
       variant="h6"
       sx={{
         fontSize,
         fontWeight: 800,
-        background: 'linear-gradient(135deg, #6C63FF, #00E5A0)',
+        background: `linear-gradient(135deg, ${gradientStart}, ${gradientEnd})`,
         backgroundClip: 'text',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',

@@ -4,6 +4,7 @@ import { Chip } from '@mui/material';
 
 const statusColors = {
   active: 'success',
+  completed: 'info',
   inactive: 'default',
   pending: 'warning',
   error: 'error',
