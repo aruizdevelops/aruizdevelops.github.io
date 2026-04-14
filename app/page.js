@@ -8,6 +8,7 @@ import {
   About,
   Services,
   Process,
+  Pricing,
   Footer,
 } from '@bluebonnet-tech/core';
 import BrushIcon from '@mui/icons-material/Brush';
@@ -85,6 +86,8 @@ function HomePage() {
         <ProjectsGrid content={content.getWork(t)} t={t} />
 
         <Process content={content.getProcess(t)} />
+
+        <Pricing content={content.getPricing(t)} />
 
         <ContactSection content={content.getContact(t)} />
       </main>
