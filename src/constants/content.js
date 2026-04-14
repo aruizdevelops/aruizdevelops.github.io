@@ -3,6 +3,15 @@
  * Each export returns the object shape that core components expect.
  */
 
+import { buildMailto } from '../utils/mailto';
+
+function interpolate(template, values) {
+  return Object.entries(values).reduce(
+    (acc, [key, value]) => acc.replaceAll(`{${key}}`, value),
+    template
+  );
+}
+
 export function getNavigation(t) {
   return {
     brand: 'Bluebonnet Tech',
@@ -91,75 +100,92 @@ export function getWork(t) {
 }
 
 export function getPricing(t) {
+  const email = t('contact.email');
+
+  const buildTierHref = ({ name, price, setup }) => {
+    const pricing = `${setup} + ${price}/month`;
+    return buildMailto({
+      email,
+      subject: interpolate(t('pricing.inquiry.subject'), { tier: name }),
+      body: interpolate(t('pricing.inquiry.body'), { tier: name, pricing }),
+    });
+  };
+
+  const basic = {
+    name: t('pricing.basic.name'),
+    price: t('pricing.basic.price'),
+    setup: t('pricing.basic.setup'),
+    description: t('pricing.basic.description'),
+    ctaLabel: t('pricing.basic.cta'),
+    highlighted: false,
+    badge: null,
+    features: [
+      t('pricing.basic.feature1'),
+      t('pricing.basic.feature2'),
+      t('pricing.basic.feature3'),
+      t('pricing.basic.feature4'),
+      t('pricing.basic.feature5'),
+      t('pricing.basic.feature6'),
+      t('pricing.basic.feature7'),
+      t('pricing.basic.feature8'),
+      t('pricing.basic.feature9'),
+    ],
+  };
+
+  const growth = {
+    name: t('pricing.growth.name'),
+    price: t('pricing.growth.price'),
+    setup: t('pricing.growth.setup'),
+    description: t('pricing.growth.description'),
+    ctaLabel: t('pricing.growth.cta'),
+    highlighted: true,
+    badge: t('pricing.growth.badge'),
+    features: [
+      t('pricing.growth.feature1'),
+      t('pricing.growth.feature2'),
+      t('pricing.growth.feature3'),
+      t('pricing.growth.feature4'),
+      t('pricing.growth.feature5'),
+      t('pricing.growth.feature6'),
+      t('pricing.growth.feature7'),
+    ],
+  };
+
+  const control = {
+    name: t('pricing.control.name'),
+    price: t('pricing.control.price'),
+    setup: t('pricing.control.setup'),
+    description: t('pricing.control.description'),
+    ctaLabel: t('pricing.control.cta'),
+    highlighted: false,
+    badge: null,
+    features: [
+      t('pricing.control.feature1'),
+      t('pricing.control.feature2'),
+      t('pricing.control.feature3'),
+      t('pricing.control.feature4'),
+      t('pricing.control.feature5'),
+      t('pricing.control.feature6'),
+    ],
+  };
+
   return {
     overline: t('pricing.overline'),
     headline: t('pricing.headline'),
     subtitle: t('pricing.subtitle'),
-    tiers: [
-      {
-        name: t('pricing.basic.name'),
-        price: t('pricing.basic.price'),
-        setup: t('pricing.basic.setup'),
-        description: t('pricing.basic.description'),
-        ctaLabel: t('pricing.basic.cta'),
-        ctaHref: '#contact',
-        highlighted: false,
-        badge: null,
-        features: [
-          t('pricing.basic.feature1'),
-          t('pricing.basic.feature2'),
-          t('pricing.basic.feature3'),
-          t('pricing.basic.feature4'),
-          t('pricing.basic.feature5'),
-          t('pricing.basic.feature6'),
-          t('pricing.basic.feature7'),
-          t('pricing.basic.feature8'),
-          t('pricing.basic.feature9'),
-        ],
-      },
-      {
-        name: t('pricing.growth.name'),
-        price: t('pricing.growth.price'),
-        setup: t('pricing.growth.setup'),
-        description: t('pricing.growth.description'),
-        ctaLabel: t('pricing.growth.cta'),
-        ctaHref: '#contact',
-        highlighted: true,
-        badge: t('pricing.growth.badge'),
-        features: [
-          t('pricing.growth.feature1'),
-          t('pricing.growth.feature2'),
-          t('pricing.growth.feature3'),
-          t('pricing.growth.feature4'),
-          t('pricing.growth.feature5'),
-          t('pricing.growth.feature6'),
-          t('pricing.growth.feature7'),
-        ],
-      },
-      {
-        name: t('pricing.control.name'),
-        price: t('pricing.control.price'),
-        setup: t('pricing.control.setup'),
-        description: t('pricing.control.description'),
-        ctaLabel: t('pricing.control.cta'),
-        ctaHref: '#contact',
-        highlighted: false,
-        badge: null,
-        features: [
-          t('pricing.control.feature1'),
-          t('pricing.control.feature2'),
-          t('pricing.control.feature3'),
-          t('pricing.control.feature4'),
-          t('pricing.control.feature5'),
-          t('pricing.control.feature6'),
-        ],
-      },
-    ],
+    tiers: [basic, growth, control].map((tier) => ({
+      ...tier,
+      ctaHref: buildTierHref(tier),
+    })),
     custom: {
       title: t('pricing.custom.title'),
       description: t('pricing.custom.description'),
       ctaLabel: t('pricing.custom.cta'),
-      ctaHref: '#contact',
+      ctaHref: buildMailto({
+        email,
+        subject: t('pricing.custom.subject'),
+        body: t('pricing.custom.body'),
+      }),
     },
   };
 }

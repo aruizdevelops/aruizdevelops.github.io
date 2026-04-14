@@ -157,6 +157,11 @@
   "pricing.custom.description": "¿Necesitas un sistema de reservas personalizado, panel de clientes, portal de negocio o plataforma multi-ubicación? Las funciones avanzadas y aplicaciones personalizadas se definen y cotizan por separado según tus requisitos.",
   "pricing.custom.cta": "Solicitar una Cotización",
 
+  "pricing.inquiry.subject": "Consulta: paquete {tier}",
+  "pricing.inquiry.body": "Hola Allen,\n\nMe interesa el paquete {tier} ({pricing}).\n\n— Nombre del negocio:\n— Sitio web / redes sociales:\n— En qué necesito ayuda:\n— Plazo preferido:\n\n¡Gracias!",
+  "pricing.custom.subject": "Consulta: cotización de solución personalizada",
+  "pricing.custom.body": "Hola Allen,\n\nMe gustaría solicitar una cotización personalizada.\n\n— Nombre del negocio:\n— Sitio web / redes sociales:\n— En qué necesito ayuda:\n— Plazo preferido:\n\n¡Gracias!",
+
   "process.overline": "Cómo Trabajo",
   "process.headline": "De la Idea al Lanzamiento",
   "process.subtitle": "Un proceso claro y colaborativo diseñado para avanzar rápido sin cortar esquinas.",

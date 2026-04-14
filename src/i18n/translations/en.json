@@ -157,6 +157,11 @@
   "pricing.custom.description": "Need a custom booking system, client dashboard, business portal, or multi-location platform? Advanced features and custom applications are scoped and quoted separately based on your requirements.",
   "pricing.custom.cta": "Request a Custom Quote",
 
+  "pricing.inquiry.subject": "Inquiry: {tier} package",
+  "pricing.inquiry.body": "Hi Allen,\n\nI'm interested in the {tier} package ({pricing}).\n\n— Business name:\n— Website / social links:\n— What I need help with:\n— Preferred timeline:\n\nThanks!",
+  "pricing.custom.subject": "Inquiry: Custom solution quote",
+  "pricing.custom.body": "Hi Allen,\n\nI'd like to request a custom quote.\n\n— Business name:\n— Website / social links:\n— What I need help with:\n— Preferred timeline:\n\nThanks!",
+
   "process.overline": "How I Work",
   "process.headline": "From Idea to Launch",
   "process.subtitle": "A clear, collaborative process designed to move fast without cutting corners.",
