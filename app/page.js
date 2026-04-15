@@ -26,6 +26,7 @@ import { useTranslation } from '../src/i18n/useTranslation';
 import PortfolioHero from '../src/components/landing/PortfolioHero';
 import ProjectsGrid from '../src/components/landing/ProjectsGrid';
 import ContactSection from '../src/components/landing/ContactSection';
+import LanguagePicker from '../src/components/ui/LanguagePicker';
 
 const servicesIconMap = {
   Brush: BrushIcon,
@@ -73,6 +74,8 @@ function HomePage() {
       >
         {t('a11y.skipToContent')}
       </Box>
+
+      <LanguagePicker />
 
       <Navigation content={content.getNavigation(t)} />
 

@@ -1,6 +1,10 @@
 {
   "a11y.skipToContent": "Saltar al contenido principal",
 
+  "languagePicker.label": "Cambiar idioma",
+  "languagePicker.english": "Inglés",
+  "languagePicker.spanish": "Español",
+
   "nav.about": "Acerca",
   "nav.services": "Servicios",
   "nav.work": "Proyectos",

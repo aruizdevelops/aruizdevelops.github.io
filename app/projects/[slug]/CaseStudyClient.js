@@ -19,6 +19,7 @@ import { getProjectBySlug } from '../../../src/constants/projects';
 import { LanguageProvider } from '../../../src/i18n/LanguageContext';
 import { useTranslation } from '../../../src/i18n/useTranslation';
 import CaseStudyLayout from '../../../src/components/projects/CaseStudyLayout';
+import LanguagePicker from '../../../src/components/ui/LanguagePicker';
 
 const socialIcons = [
   { label: 'GitHub', icon: GitHubIcon, href: 'https://github.com/aruizdevelops' },
@@ -33,6 +34,7 @@ function CaseStudyPage() {
   if (!project) {
     return (
       <>
+        <LanguagePicker />
         <Navigation content={content.getNavigation(t)} />
         <Container sx={{ py: 20, textAlign: 'center' }}>
           <Typography variant="h3" sx={{ mb: 3 }}>
@@ -57,6 +59,7 @@ function CaseStudyPage() {
 
   return (
     <>
+      <LanguagePicker />
       <Navigation content={content.getNavigation(t)} />
       <CaseStudyLayout project={project} t={t} />
       <Footer content={content.getFooter(t)} socialIcons={socialIcons} />
