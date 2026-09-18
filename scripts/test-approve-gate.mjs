@@ -21,16 +21,52 @@ const TEST_BATCH = {
   region: 'internal',
   leads: [
     {
-      id: 'internal-test-lead',
-      business_name: 'Internal Test Lead',
+      id: 'internal-email-lead',
+      business_name: 'Internal Email Lead',
       niche: 'test',
       city: 'Austin',
-      phone: '',
+      phone: '512-555-0100',
+      email: 'shop@example.com',
+      why: 'E2E fixture only; not published on GitHub Pages.',
+      website_url: '',
+      maps_url: '',
+      status: 'ready_for_outreach',
+    },
+    {
+      id: 'internal-call-lead',
+      business_name: 'Internal Call Lead',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0199',
       email: '',
       why: 'E2E fixture only; not published on GitHub Pages.',
       website_url: '',
       maps_url: '',
       status: 'ready_for_outreach',
+    },
+    {
+      id: 'internal-callback-lead',
+      business_name: 'Internal Callback Lead',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0188',
+      email: '',
+      why: 'E2E fixture only; not published on GitHub Pages.',
+      website_url: '',
+      maps_url: '',
+      status: 'ready_for_outreach',
+    },
+    {
+      id: 'internal-skip-phone',
+      business_name: 'Internal Skip Phone',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0111',
+      email: '',
+      why: 'E2E fixture only; not published on GitHub Pages.',
+      website_url: '',
+      maps_url: '',
+      status: 'skip',
     },
   ],
 };
@@ -313,9 +349,20 @@ async function main() {
       failures.push(`enroll error: ${enrollError}`);
     }
     await page.waitForSelector('.approve-card', { timeout: 15000 });
+    const emailTab = page.getByRole('tab', { name: /Email/ });
+    const callTab = page.getByRole('tab', { name: /Call/ });
+    if (!(await emailTab.isVisible()) || !(await callTab.isVisible())) {
+      failures.push('Email | Call tabs missing after unlock');
+    }
     const name = await page.locator('.approve-name').first().textContent();
-    if (!/Internal Test Lead/.test(name || '')) {
-      failures.push(`unexpected card after enroll: ${name}`);
+    if (!/Internal Email Lead/.test(name || '')) {
+      failures.push(`unexpected Email-tab card after enroll: ${name}`);
+    }
+    if ((await page.getByRole('button', { name: 'Accept' }).count()) === 0) {
+      failures.push('Accept missing on Email tab');
+    }
+    if ((await page.locator('.approve-name').count()) !== 1) {
+      failures.push('Email tab should show only the emailable lead');
     }
     await shot('approve_unlocked_after_enroll.png');
 
@@ -329,11 +376,94 @@ async function main() {
       if (keys !== 'action,batch_id,business_name,lead_id') {
         failures.push(`decision body keys: ${keys}`);
       }
-      if (body.action !== 'approve' || body.lead_id !== 'internal-test-lead') {
+      if (body.action !== 'approve' || body.lead_id !== 'internal-email-lead') {
         failures.push(`bad decision payload ${JSON.stringify(body)}`);
       }
     }
     await shot('approve_accept_recorded.png');
+
+    await callTab.click();
+    await page.waitForSelector('.approve-btn-callback, .approve-status-msg', {
+      timeout: 5000,
+    });
+    const callNames = await page.locator('.approve-name').allTextContents();
+    if (!callNames.some((text) => /Internal Call Lead/.test(text))) {
+      failures.push(`Call tab missing phone-only lead: ${callNames.join(' | ')}`);
+    }
+    if (callNames.some((text) => /Internal Email Lead/.test(text))) {
+      failures.push('Email lead leaked onto Call tab');
+    }
+    if (callNames.some((text) => /Internal Skip Phone/.test(text))) {
+      failures.push('skip-status phone lead appeared on Call tab');
+    }
+    if ((await page.getByRole('button', { name: 'Accept' }).count()) !== 0) {
+      failures.push('Accept shown on Call tab');
+    }
+    if ((await page.getByRole('button', { name: 'Skip' }).count()) !== 0) {
+      failures.push('Skip shown on Call tab');
+    }
+    if ((await page.getByRole('button', { name: 'Called' }).count()) !== 0) {
+      failures.push('Called button shipped on Call tab');
+    }
+    for (const label of ['Interested', 'Callback', 'No answer', 'Bad number', 'Remove']) {
+      if ((await page.getByRole('button', { name: label }).count()) === 0) {
+        failures.push(`missing Call button: ${label}`);
+      }
+    }
+    await shot('approve_call_tab_outcomes.png');
+
+    await page.getByRole('button', { name: 'Callback' }).first().click();
+    const callbackError =
+      (await page.locator('.approve-error').first().textContent().catch(() => '')) ||
+      '';
+    if (!/callback date and time/i.test(callbackError)) {
+      failures.push(`missing required callback picker error: ${callbackError}`);
+    }
+    if (decisions.length !== 1) {
+      failures.push(
+        `Callback without datetime posted: ${JSON.stringify(decisions)}`,
+      );
+    }
+
+    await page.getByRole('button', { name: 'Interested' }).first().click();
+    await page.waitForSelector('.approve-done-bar', { timeout: 10000 });
+    if (decisions.length !== 2) {
+      failures.push(`expected Interested decision, got ${decisions.length}`);
+    } else if (decisions[1].action !== 'interested' || decisions[1].lead_id !== 'internal-call-lead') {
+      failures.push(`bad interested payload ${JSON.stringify(decisions[1])}`);
+    } else if (Object.keys(decisions[1]).sort().join(',') !== 'action,batch_id,business_name,lead_id') {
+      failures.push(`interested extra keys ${Object.keys(decisions[1])}`);
+    }
+    await shot('approve_call_interested.png');
+
+    const callbackLead = page.locator('.approve-card').filter({
+      hasText: 'Internal Callback Lead',
+    });
+    await callbackLead.locator('input[type="datetime-local"]').fill('2026-09-20T10:30');
+    await callbackLead.getByRole('button', { name: 'Callback' }).click();
+    await callbackLead.locator('.approve-done-bar').waitFor({ timeout: 10000 });
+    if (decisions.length !== 3) {
+      failures.push(`expected Callback decision, got ${decisions.length}`);
+    } else {
+      const body = decisions[2];
+      if (body.action !== 'callback' || body.lead_id !== 'internal-callback-lead') {
+        failures.push(`bad callback payload ${JSON.stringify(body)}`);
+      }
+      if (!body.callback_at || Number.isNaN(Date.parse(body.callback_at))) {
+        failures.push(`callback_at missing/invalid ${JSON.stringify(body)}`);
+      }
+      const keys = Object.keys(body).sort().join(',');
+      if (keys !== 'action,batch_id,business_name,callback_at,lead_id') {
+        failures.push(`callback body keys: ${keys}`);
+      }
+    }
+    await shot('approve_call_callback.png');
+
+    await emailTab.click();
+    await page.waitForSelector('.approve-done-bar', { timeout: 5000 });
+    if ((await page.getByRole('button', { name: 'Interested' }).count()) !== 0) {
+      failures.push('Call outcomes leaked onto Email tab');
+    }
 
     await page.getByRole('button', { name: 'Lock' }).click();
     await page.waitForSelector('.approve-lock-title', { timeout: 5000 });

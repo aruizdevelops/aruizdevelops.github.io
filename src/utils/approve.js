@@ -14,7 +14,28 @@ export const APPROVE_SESSION_KEY = 'tcs-approve-session';
 export const APPROVE_ENROLLED_KEY = 'tcs-approve-enrolled';
 
 const MAX_TEXT_LENGTH = 200;
-const ALLOWED_ACTIONS = new Set(['approve', 'skip', 'ping']);
+export const EMAIL_ACTIONS = new Set(['approve', 'skip']);
+export const CALL_ACTIONS = new Set([
+  'interested',
+  'callback',
+  'no_answer',
+  'bad_number',
+  'remove',
+]);
+export const RECORDED_ACTIONS = new Set([...EMAIL_ACTIONS, ...CALL_ACTIONS]);
+const ALLOWED_ACTIONS = new Set([...RECORDED_ACTIONS, 'ping']);
+
+export function isRecordedAction(action) {
+  return RECORDED_ACTIONS.has(action);
+}
+
+export function isEmailAction(action) {
+  return EMAIL_ACTIONS.has(action);
+}
+
+export function isCallAction(action) {
+  return CALL_ACTIONS.has(action);
+}
 
 export { APPROVAL_PROXY_URL, isWebAuthnSupported, webAuthnErrorMessage };
 
@@ -74,12 +95,73 @@ export function formatStatusLabel(status) {
 
 export function statusTone(status) {
   const normalized = formatStatusLabel(status);
-  if (normalized.includes('research')) return 'research';
-  if (normalized.includes('skip')) return 'skip';
-  if (normalized.includes('accept') || normalized.includes('approv')) {
+  if (normalized.includes('research') || normalized.includes('no answer')) {
+    return 'research';
+  }
+  if (
+    normalized.includes('skip') ||
+    normalized.includes('bad number') ||
+    normalized.includes('removed')
+  ) {
+    return 'skip';
+  }
+  if (normalized.includes('callback')) return 'callback';
+  if (
+    normalized.includes('accept') ||
+    normalized.includes('approv') ||
+    normalized.includes('interest')
+  ) {
     return 'accept';
   }
   return 'ready';
+}
+
+export function formatDecisionLabel(action) {
+  switch (action) {
+    case 'approve':
+      return 'accepted';
+    case 'skip':
+      return 'skipped';
+    case 'interested':
+      return 'interested';
+    case 'callback':
+      return 'callback';
+    case 'no_answer':
+      return 'no answer';
+    case 'bad_number':
+      return 'bad number';
+    case 'remove':
+      return 'removed';
+    default:
+      return '';
+  }
+}
+
+export function decisionTone(action) {
+  return statusTone(formatDecisionLabel(action) || action);
+}
+
+export function toIsoDatetime(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+  }
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString();
+}
+
+export function formatCallbackWhen(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 export function formatBatchDate(iso, batchId) {
@@ -110,6 +192,41 @@ export function formatCountLine(counts) {
   return [...counts.entries()]
     .map(([label, count]) => `${label} ${count}`)
     .join(' · ');
+}
+
+function fieldAsEmail(value) {
+  if (typeof value !== 'string') return '';
+  return sanitizeText(value, 200);
+}
+
+export function getPublicEmail(lead) {
+  return (
+    fieldAsEmail(lead?.email) || fieldAsEmail(lead?.email_if_public_business)
+  );
+}
+
+export function hasPhone(lead) {
+  return Boolean(sanitizeText(lead?.phone, 80));
+}
+
+export function isSkipStatus(lead) {
+  return formatStatusLabel(lead?.status).includes('skip');
+}
+
+export function isEmailLead(lead) {
+  return Boolean(getPublicEmail(lead));
+}
+
+export function isCallLead(lead) {
+  return hasPhone(lead) && !isEmailLead(lead) && !isSkipStatus(lead);
+}
+
+export function partitionLeads(leads) {
+  const list = Array.isArray(leads) ? leads : [];
+  return {
+    email: list.filter(isEmailLead),
+    call: list.filter(isCallLead),
+  };
 }
 
 export function buildVerifyLinks(lead) {
@@ -144,27 +261,35 @@ export function buildVerifyLinks(lead) {
   return links;
 }
 
-export function buildDecisionPayload({ action, lead, batchId }) {
+export function buildDecisionPayload({ action, lead, batchId, callbackAt }) {
   const verb = ALLOWED_ACTIONS.has(action) ? action : 'ping';
-  return {
+  const payload = {
     action: verb,
     lead_id: sanitizeText(lead?.id, 80),
     business_name: sanitizeText(lead?.business_name, 120),
     batch_id: sanitizeText(batchId, 80),
   };
+  if (verb === 'callback') {
+    const iso = toIsoDatetime(callbackAt);
+    if (iso) payload.callback_at = iso;
+  }
+  return payload;
 }
 
-export function buildDecisionMailto({ action, lead, batchId }) {
-  const payload = buildDecisionPayload({ action, lead, batchId });
-  const verb = payload.action === 'skip' ? 'skip' : 'approve';
+export function buildDecisionMailto({ action, lead, batchId, callbackAt }) {
+  const payload = buildDecisionPayload({ action, lead, batchId, callbackAt });
+  const verb = payload.action;
   const subject = `${verb}: ${payload.lead_id} ${payload.business_name}`;
   const body = [
     `Action: ${verb}`,
     `Lead: ${payload.lead_id}`,
     `Business: ${payload.business_name}`,
     `Batch: ${payload.batch_id}`,
+    payload.callback_at ? `Callback at: ${payload.callback_at}` : '',
     `Recorded at: ${new Date().toISOString()}`,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return buildMailto({
     email: APPROVE_NOTIFY_EMAIL,
@@ -194,25 +319,31 @@ export function getLeadDecision(store, batchId, leadId) {
   const batch = store?.[batchId];
   if (!batch || typeof batch !== 'object') return null;
   const entry = batch[leadId];
-  if (!entry || (entry.action !== 'approve' && entry.action !== 'skip')) {
+  if (!entry || !isRecordedAction(entry.action)) {
     return null;
   }
   return entry;
 }
 
-export function storeLeadDecision({ batchId, leadId, action }) {
+export function storeLeadDecision({ batchId, leadId, action, callbackAt }) {
   if (typeof window === 'undefined') return readDecisionStore();
   const store = readDecisionStore();
   const batchKey = sanitizeText(batchId, 80);
   const id = sanitizeText(leadId, 80);
   if (!batchKey || !id) return store;
-  if (action !== 'approve' && action !== 'skip') return store;
+  if (!isRecordedAction(action)) return store;
+
+  const recorded = { action, at: new Date().toISOString() };
+  if (action === 'callback') {
+    const iso = toIsoDatetime(callbackAt);
+    if (iso) recorded.callback_at = iso;
+  }
 
   const batch = {
     ...(store[batchKey] && typeof store[batchKey] === 'object'
       ? store[batchKey]
       : {}),
-    [id]: { action, at: new Date().toISOString() },
+    [id]: recorded,
   };
 
   const next = { ...store, [batchKey]: batch };
@@ -703,8 +834,14 @@ export function openMailto(href) {
   window.location.href = href;
 }
 
-export async function submitLeadDecision({ action, lead, batch, token }) {
-  if (action !== 'approve' && action !== 'skip') {
+export async function submitLeadDecision({
+  action,
+  lead,
+  batch,
+  token,
+  callbackAt,
+}) {
+  if (!isRecordedAction(action)) {
     return {
       store: readDecisionStore(),
       recordedLocally: false,
@@ -715,8 +852,25 @@ export async function submitLeadDecision({ action, lead, batch, token }) {
     };
   }
 
+  const isoCallback = action === 'callback' ? toIsoDatetime(callbackAt) : '';
+  if (action === 'callback' && !isoCallback) {
+    return {
+      store: readDecisionStore(),
+      recordedLocally: false,
+      submittedToProxy: false,
+      usedMailto: false,
+      mailtoHref: null,
+      reason: 'missing-callback-at',
+    };
+  }
+
   const batchId = sanitizeText(batch?.batch_id, 80);
-  const payload = buildDecisionPayload({ action, lead, batchId });
+  const payload = buildDecisionPayload({
+    action,
+    lead,
+    batchId,
+    callbackAt: isoCallback,
+  });
   const sessionToken = token || readSessionToken();
   const proxyConfigured = isApprovalProxyConfigured();
 
@@ -725,13 +879,19 @@ export async function submitLeadDecision({ action, lead, batch, token }) {
       batchId,
       leadId: lead?.id,
       action,
+      callbackAt: isoCallback,
     });
     return {
       store,
       recordedLocally: true,
       submittedToProxy: false,
       usedMailto: true,
-      mailtoHref: buildDecisionMailto({ action, lead, batchId }),
+      mailtoHref: buildDecisionMailto({
+        action,
+        lead,
+        batchId,
+        callbackAt: isoCallback,
+      }),
       reason: 'proxy-not-configured',
     };
   }
@@ -754,6 +914,7 @@ export async function submitLeadDecision({ action, lead, batch, token }) {
     batchId,
     leadId: lead?.id,
     action,
+    callbackAt: isoCallback,
   });
   return {
     store,
