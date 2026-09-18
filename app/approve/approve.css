@@ -135,6 +135,10 @@
   background: #0f766e;
 }
 
+.approve-pill-callback {
+  background: #0f172a;
+}
+
 .approve-pill-research {
   background: #b45309;
 }
@@ -251,10 +255,26 @@
   color: #fff;
 }
 
+.approve-done-bar.is-callback {
+  background: #0f172a;
+  color: #5eead4;
+}
+
+.approve-done-bar.is-research {
+  background: #fffbeb;
+  border: 1.5px solid #fbbf24;
+  color: #92400e;
+}
+
 .approve-done-bar.is-skip {
   background: #fff1f2;
   border: 1.5px solid #fda4af;
   color: #9f1239;
+}
+
+.approve-done-bar.is-ready {
+  background: #0f766e;
+  color: #fff;
 }
 
 .approve-mailto {
@@ -428,31 +448,71 @@
   background: rgba(94, 234, 212, 0.18);
 }
 
-.approve-call-note {
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
-  border-radius: 12px;
-  color: #0f766e;
-  font-size: 13px;
-  line-height: 1.45;
+.approve-actions-call {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
-.approve-call-note strong {
-  display: block;
-  margin-bottom: 4px;
+.approve-actions-call .approve-btn-remove {
+  grid-column: 1 / -1;
+}
+
+.approve-btn-callback {
+  border: 0;
+  background: #0f172a;
+  color: #5eead4;
+}
+
+.approve-btn-no-answer {
+  border: 1.5px solid #94a3b8;
+  background: #fff;
   color: #0f172a;
-  font-size: 14px;
 }
 
-.approve-readonly {
-  margin: 12px 0 0;
+.approve-btn-bad-number {
+  border: 1.5px solid #fbbf24;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.approve-btn-remove {
+  border: 1.5px solid #fda4af;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.approve-callback {
+  margin-top: 12px;
   padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
+}
+
+.approve-callback label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.approve-callback input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.approve-callback input:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 2px;
 }

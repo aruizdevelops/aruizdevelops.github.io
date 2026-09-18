@@ -18,7 +18,7 @@ Email Allen that link when a batch is ready. The page is an internal review UI (
 4. If the page still shows the lock screen, tap **Unlock with Face ID / Touch ID**.
 5. Lead cards load from the proxy. After unlock, **Email** and **Call** tabs split the batch:
    - **Email** — shops with a public email (`email` or `email_if_public_business`). Accept / Skip as usual.
-   - **Call** — phone-only shops (has phone, no public email; `status` skip excluded). Read-only until call outcome buttons are locked.
+   - **Call** — phone-only shops (has phone, no public email; `status` skip excluded). Outcomes: Interested, Callback (date/time required), No answer, Bad number, Remove.
 
 Later visits: tap **Unlock with Face ID / Touch ID**. The lock screen calls `GET {APPROVAL_PROXY_URL}/health`. If `registration_open` is `false` or `credential_count >= max_credentials`, **Register this device** is hidden — only Unlock is shown. Do not publish leads on GitHub Pages.
 
@@ -106,12 +106,20 @@ The page always adds a **Google** verify pill from name + city.
 
 After unlock, the batch is filtered **client-side**:
 
-- **Email tab** — non-empty public email (`email` or `email_if_public_business`). Phone-only shops never appear here.
-- **Call tab** — has phone, no public email, and `status` is not skip. Read-only for now; outcome buttons are not shipped until Allen locks them.
+- **Email tab** — non-empty public email (`email` or `email_if_public_business`). Phone-only shops never appear here. **Accept** / **Skip** only.
+- **Call tab** — has phone, no public email, and `status` is not skip. Outcomes:
+
+  | Button | `action` |
+  | --- | --- |
+  | Interested | `interested` |
+  | Callback | `callback` plus `callback_at` (ISO datetime; picker required before submit) |
+  | No answer | `no_answer` |
+  | Bad number | `bad_number` |
+  | Remove | `remove` (client asked off the list) |
 
 ## How a decision is recorded
 
-On **Accept** or **Skip** on the **Email** tab (only after unlock):
+On **Accept** or **Skip** on the **Email** tab, or a Call outcome (only after unlock):
 
 1. The page POSTs JSON to:
 
@@ -134,7 +142,7 @@ On **Accept** or **Skip** on the **Email** tab (only after unlock):
 
    That session token is issued by `POST /webauthn/login/verify`. It is **not** a Cursor sender key.
 
-2. Body (unchanged):
+2. Email body:
 
    ```json
    {
@@ -145,7 +153,19 @@ On **Accept** or **Skip** on the **Email** tab (only after unlock):
    }
    ```
 
-   `action` is `approve` or `skip`. The Call tab does not POST a decision yet.
+   Email `action` is `approve` or `skip`. Call body uses the same four fields, plus `callback_at` only when `action` is `callback`:
+
+   ```json
+   {
+     "action": "callback",
+     "lead_id": "lead-002",
+     "business_name": "Phone Shop",
+     "batch_id": "2026-09-19",
+     "callback_at": "2026-09-20T15:30:00.000Z"
+   }
+   ```
+
+   Call `action` is `interested`, `callback`, `no_answer`, `bad_number`, or `remove`.
 
 3. On a successful proxy POST, the card is marked done in `localStorage` (`tcs-lead-approvals`, keyed by `batch_id` + lead `id`). That is device-only.
 
@@ -179,7 +199,7 @@ The live proxy is the Cloudflare tunnel above. It must:
   | `POST /webauthn/login/options` | no | Create assertion options. |
   | `POST /webauthn/login/verify` | no | Verify assertion. Return `{ "session_token": "..." }`. |
   | `GET /batch` | session | Return the current batch JSON. |
-  | `POST /decision` | session | Accept/Skip body above; forward to Cursor **server-side** with the sender key. |
+  | `POST /decision` | session | Email Accept/Skip or Call outcomes above; forward to Cursor **server-side** with the sender key. |
 
 - Reject `GET /batch` and `POST /decision` without a valid session (`401` `unauthorized`, or `401` `batch_changed` when the published batch has moved on).
 - Restrict passkey registration to Allen’s allowlist and cap (`max_credentials`). When full, `registration_open` is `false` and `POST /webauthn/register/options` returns `403`.

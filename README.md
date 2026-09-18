@@ -36,6 +36,6 @@ https://aruizdevelops.github.io/approve/
 
 The page is passkey-gated. First visit (while enrollment is open): **Register this device** + Face ID / Touch ID. Later visits, or when enrollment is full: **Unlock with Face ID / Touch ID** only. Leads load from authenticated `GET {APPROVAL_PROXY_URL}/batch` after WebAuthn login. `public/approve/batch.json` is an empty placeholder — not the source of truth.
 
-After unlock, **Email** and **Call** tabs split the batch client-side. Email (public email only) still Accept/Skip POSTs `{action, lead_id, business_name, batch_id}` to `https://authorized-philip-mechanics-rick.trycloudflare.com/decision` with the session token. Call is a phone-only review list until outcome buttons are locked. The Cursor sender key never ships in this repo.
+After unlock, **Email** and **Call** tabs split the batch client-side. Email (public email only) Accept/Skip POSTs `{action, lead_id, business_name, batch_id}`. Call (phone-only) POSTs `{action, lead_id, business_name, batch_id, callback_at?}` with `interested` | `callback` | `no_answer` | `bad_number` | `remove`. Session headers on both. The Cursor sender key never ships in this repo.
 
 See [APPROVE.md](./APPROVE.md) for enroll steps, the JSON shape, POST body, and how decisions are recorded.

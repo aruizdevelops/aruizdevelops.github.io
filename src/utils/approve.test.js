@@ -24,6 +24,7 @@ import {
   sessionInvalidKind,
   sessionInvalidMessage,
   submitLeadDecision,
+  toIsoDatetime,
 } from './approve.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -180,6 +181,51 @@ describe('decision payload', () => {
     });
   });
 
+  it('sends locked Call outcomes and callback_at only for callback', () => {
+    const base = {
+      lead: { id: 'phone-only', business_name: 'Phone Shop' },
+      batchId: 'leads-csv-2026-09-18',
+    };
+    assert.deepEqual(buildDecisionPayload({ action: 'interested', ...base }), {
+      action: 'interested',
+      lead_id: 'phone-only',
+      business_name: 'Phone Shop',
+      batch_id: 'leads-csv-2026-09-18',
+    });
+    assert.equal(
+      buildDecisionPayload({ action: 'no_answer', ...base }).action,
+      'no_answer',
+    );
+    assert.equal(
+      buildDecisionPayload({ action: 'bad_number', ...base }).action,
+      'bad_number',
+    );
+    assert.equal(
+      buildDecisionPayload({ action: 'remove', ...base }).action,
+      'remove',
+    );
+
+    const missingWhen = buildDecisionPayload({ action: 'callback', ...base });
+    assert.equal(missingWhen.action, 'callback');
+    assert.equal('callback_at' in missingWhen, false);
+
+    const withWhen = buildDecisionPayload({
+      action: 'callback',
+      ...base,
+      callbackAt: '2026-09-20T10:30',
+    });
+    assert.equal(withWhen.action, 'callback');
+    assert.equal(withWhen.callback_at, toIsoDatetime('2026-09-20T10:30'));
+    assert.match(withWhen.callback_at, /^\d{4}-\d{2}-\d{2}T/);
+    assert.deepEqual(Object.keys(withWhen).sort(), [
+      'action',
+      'batch_id',
+      'business_name',
+      'callback_at',
+      'lead_id',
+    ]);
+  });
+
   it('does not POST invented call outcome actions', () => {
     const payload = buildDecisionPayload({
       action: 'called',
@@ -238,11 +284,19 @@ describe('public batch.json placeholder', () => {
     assert.match(client, /Call/);
     assert.match(client, /No email leads in this batch/);
     assert.match(client, /No call leads in this batch/);
-    assert.match(client, /Call outcomes coming/);
+    assert.match(client, /Interested/);
+    assert.match(client, /Callback/);
+    assert.match(client, /No answer/);
+    assert.match(client, /Bad number/);
+    assert.match(client, /Remove/);
+    assert.match(client, /datetime-local/);
+    assert.match(client, /interested/);
+    assert.match(client, /no_answer/);
+    assert.match(client, /bad_number/);
+    assert.doesNotMatch(client, /Call outcomes coming/);
+    assert.doesNotMatch(client, /readOnly/);
     assert.doesNotMatch(client, /action:\s*['"]called['"]/);
     assert.doesNotMatch(client, /['"]called['"]/);
-    assert.doesNotMatch(client, /No answer/);
-    assert.doesNotMatch(client, /Bad number/);
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
   });
 });
@@ -416,5 +470,57 @@ describe('proxy fetches', () => {
     assert.equal(result.reason, 'unauthorized');
     assert.equal(sessionInvalidKind(result), 'unauthorized');
     assert.equal(result.recordedLocally, false);
+  });
+
+  it('refuses callback without callback_at and does not POST', async () => {
+    let posted = 0;
+    globalThis.fetch = async () => {
+      posted += 1;
+      return jsonResponse(200, { ok: true });
+    };
+    const result = await submitLeadDecision({
+      action: 'callback',
+      lead: { id: 'phone-only', business_name: 'Phone Shop' },
+      batch: { batch_id: '2026-09-19' },
+      token: 'sess-ok',
+    });
+    assert.equal(result.reason, 'missing-callback-at');
+    assert.equal(result.submittedToProxy, false);
+    assert.equal(posted, 0);
+  });
+
+  it('POSTs interested and callback with session headers', async () => {
+    const bodies = [];
+    globalThis.fetch = async (url, init) => {
+      bodies.push(JSON.parse(init.body));
+      assert.match(init.headers.Authorization, /Bearer sess-ok/);
+      assert.equal(init.headers['X-Session-Token'], 'sess-ok');
+      return jsonResponse(200, { ok: true });
+    };
+    const interested = await submitLeadDecision({
+      action: 'interested',
+      lead: { id: 'phone-a', business_name: 'A' },
+      batch: { batch_id: '2026-09-19' },
+      token: 'sess-ok',
+    });
+    assert.equal(interested.submittedToProxy, true);
+    assert.deepEqual(bodies[0], {
+      action: 'interested',
+      lead_id: 'phone-a',
+      business_name: 'A',
+      batch_id: '2026-09-19',
+    });
+
+    const callback = await submitLeadDecision({
+      action: 'callback',
+      lead: { id: 'phone-b', business_name: 'B' },
+      batch: { batch_id: '2026-09-19' },
+      token: 'sess-ok',
+      callbackAt: '2026-09-20T10:30',
+    });
+    assert.equal(callback.submittedToProxy, true);
+    assert.equal(bodies[1].action, 'callback');
+    assert.equal(bodies[1].callback_at, toIsoDatetime('2026-09-20T10:30'));
+    assert.equal('callback_at' in bodies[0], false);
   });
 });
