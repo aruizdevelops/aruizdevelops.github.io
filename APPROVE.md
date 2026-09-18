@@ -104,10 +104,10 @@ Each lead:
 
 The page always adds a **Google** verify pill from name + city.
 
-After unlock, the batch is filtered **client-side**:
+After unlock, the batch is filtered **client-side** from authenticated `GET /batch` (GitHub Pages cannot read Scout’s box):
 
 - **Email tab** — non-empty public email (`email` or `email_if_public_business`). Phone-only shops never appear here. **Accept** / **Skip** only.
-- **Call tab** — has phone, no public email, and `status` is not skip. Outcomes:
+- **Call tab** — phone-only: has phone, no public email, and `status` is not skip. That filter is the Call queue on this page. Scout’s ops file `shared/local-web/call-queue.csv` lives **on the Scout box** (not in this repo). Cos/proxy may later serve that queue as `GET /batch` (or a dedicated call-queue endpoint); until then, the client phone-only filter of `/batch` is the source. If Scout’s current call queue is 58 shops, the Call tab should show those same phone-only rows.
 
   | Button | `action` |
   | --- | --- |
@@ -198,7 +198,7 @@ The live proxy is the Cloudflare tunnel above. It must:
   | `POST /webauthn/register/verify` | no | Verify attestation. First-time enroll of Allen’s device. |
   | `POST /webauthn/login/options` | no | Create assertion options. |
   | `POST /webauthn/login/verify` | no | Verify assertion. Return `{ "session_token": "..." }`. |
-  | `GET /batch` | session | Return the current batch JSON. |
+  | `GET /batch` | session | Return the current batch JSON. Call tab filters this client-side for phone-only shops (has phone, no public email, status not skip). Optional later: serve Scout’s `shared/local-web/call-queue.csv` from the box instead. |
   | `POST /decision` | session | Email Accept/Skip or Call outcomes above; forward to Cursor **server-side** with the sender key. |
 
 - Reject `GET /batch` and `POST /decision` without a valid session (`401` `unauthorized`, or `401` `batch_changed` when the published batch has moved on).

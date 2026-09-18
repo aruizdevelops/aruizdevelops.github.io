@@ -299,6 +299,18 @@ describe('public batch.json placeholder', () => {
     assert.doesNotMatch(client, /['"]called['"]/);
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
   });
+
+  it('documents Call tab as a /batch phone-only filter, not a Pages-hosted queue file', () => {
+    const docs = readFileSync(path.join(root, 'APPROVE.md'), 'utf8');
+    assert.match(docs, /shared\/local-web\/call-queue\.csv/);
+    assert.match(docs, /cannot read Scout/);
+    const client = readFileSync(
+      path.join(root, 'app/approve/ApproveClient.js'),
+      'utf8',
+    );
+    assert.doesNotMatch(client, /call-queue\.csv/);
+    assert.match(client, /partitionLeads/);
+  });
 });
 
 describe('live proxy error copy', () => {
