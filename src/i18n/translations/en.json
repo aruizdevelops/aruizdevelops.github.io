@@ -210,5 +210,24 @@
 
   "notFound.headline": "Page Not Found",
   "notFound.subtitle": "The page you're looking for doesn't exist or has been moved.",
-  "notFound.cta": "Back to Home"
+  "notFound.cta": "Back to Home",
+
+  "unsubscribe.overline": "Texas Craft Sites",
+  "unsubscribe.headline": "Unsubscribe from outreach",
+  "unsubscribe.body": "You will be removed from the Texas Craft Sites outreach list. We will not send you further cold-outreach email.",
+  "unsubscribe.emailLabel": "Email",
+  "unsubscribe.businessLabel": "Business",
+  "unsubscribe.confirm": "Confirm unsubscribe",
+  "unsubscribe.submitting": "Confirming…",
+  "unsubscribe.successHeadline": "You are unsubscribed",
+  "unsubscribe.successBody": "We've recorded your request to remove {{email}} from the Texas Craft Sites outreach list.",
+  "unsubscribe.alreadyHeadline": "Already unsubscribed",
+  "unsubscribe.alreadyBody": "{{email}} is already marked as unsubscribed on this device.",
+  "unsubscribe.missingHeadline": "Missing email",
+  "unsubscribe.missingBody": "This unsubscribe link is missing an email address. Use the link from your outreach email, or contact us directly.",
+  "unsubscribe.invalidHeadline": "Invalid email",
+  "unsubscribe.invalidBody": "The email on this link does not look valid. Use the link from your outreach email, or contact us.",
+  "unsubscribe.home": "Back to Texas Craft Sites",
+  "unsubscribe.mailtoHint": "If a mail window opened, send that message so we can add you to the suppressions list.",
+  "unsubscribe.mailtoCta": "Open unsubscribe email"
 }

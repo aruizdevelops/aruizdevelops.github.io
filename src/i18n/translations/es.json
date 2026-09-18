@@ -210,5 +210,24 @@
 
   "notFound.headline": "Página No Encontrada",
   "notFound.subtitle": "La página que buscas no existe o ha sido movida.",
-  "notFound.cta": "Volver al Inicio"
+  "notFound.cta": "Volver al Inicio",
+
+  "unsubscribe.overline": "Texas Craft Sites",
+  "unsubscribe.headline": "Cancelar suscripción",
+  "unsubscribe.body": "Serás eliminado de la lista de contacto de Texas Craft Sites. No te enviaremos más correos de divulgación en frío.",
+  "unsubscribe.emailLabel": "Correo",
+  "unsubscribe.businessLabel": "Negocio",
+  "unsubscribe.confirm": "Confirmar cancelación",
+  "unsubscribe.submitting": "Confirmando…",
+  "unsubscribe.successHeadline": "Suscripción cancelada",
+  "unsubscribe.successBody": "Registramos tu solicitud para quitar {{email}} de la lista de contacto de Texas Craft Sites.",
+  "unsubscribe.alreadyHeadline": "Ya estás dado de baja",
+  "unsubscribe.alreadyBody": "{{email}} ya está marcado como cancelado en este dispositivo.",
+  "unsubscribe.missingHeadline": "Falta el correo",
+  "unsubscribe.missingBody": "Este enlace no incluye un correo electrónico. Usa el enlace del mensaje de contacto, o escríbenos directamente.",
+  "unsubscribe.invalidHeadline": "Correo no válido",
+  "unsubscribe.invalidBody": "El correo de este enlace no parece válido. Usa el enlace del mensaje de contacto, o escríbenos.",
+  "unsubscribe.home": "Volver a Texas Craft Sites",
+  "unsubscribe.mailtoHint": "Si se abrió una ventana de correo, envía ese mensaje para que te agreguemos a la lista de exclusión.",
+  "unsubscribe.mailtoCta": "Abrir correo de cancelación"
 }
