@@ -34,6 +34,8 @@ Allen reviews Scout batches on his phone at:
 https://aruizdevelops.github.io/approve/
 ```
 
-Scout regenerates `public/approve/batch.json` per batch. Accept/Skip POST JSON to `https://authorized-philip-mechanics-rick.trycloudflare.com/decision` (override with `NEXT_PUBLIC_APPROVAL_PROXY_URL`) with **no Authorization header**. The Cursor sender key never ships in this repo.
+The page is passkey-gated. First visit: **Register this device** + Face ID / Touch ID. Later visits: unlock, then Accept/Skip. Leads load from authenticated `GET {APPROVAL_PROXY_URL}/batch` after WebAuthn login. `public/approve/batch.json` is an empty placeholder — not the source of truth.
 
-See [APPROVE.md](./APPROVE.md) for the JSON shape, POST body, and how decisions are recorded.
+Accept/Skip POST JSON `{action, lead_id, business_name, batch_id}` to `https://authorized-philip-mechanics-rick.trycloudflare.com/decision` (override with `NEXT_PUBLIC_APPROVAL_PROXY_URL`) with the session token. The Cursor sender key never ships in this repo.
+
+See [APPROVE.md](./APPROVE.md) for enroll steps, the JSON shape, POST body, and how decisions are recorded.
