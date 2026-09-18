@@ -16,9 +16,9 @@ Email Allen that link when a batch is ready. The page is an internal review UI (
 2. Tap **Register this device**.
 3. Complete Face ID / Touch ID (platform authenticator).
 4. If the page still shows the lock screen, tap **Unlock with Face ID / Touch ID**.
-5. Lead cards load from the proxy. After unlock, **Email** and **Call** tabs split the batch:
-   - **Email** — shops with a public email (`email` or `email_if_public_business`). Accept / Skip as usual.
-   - **Call** — phone-only shops (has phone, no public email; `status` skip excluded). Outcomes: Interested, Callback (date/time required), No answer, Bad number, Remove.
+5. Lead cards load from the proxy. After unlock, **Email** and **Call** tabs use separate authenticated feeds:
+   - **Email** — `GET /batch`, then keep shops with a public email (`email` or `email_if_public_business`). Accept / Skip as usual.
+   - **Call** — `GET /call-queue` (session headers). Not a client-side filter of `/batch`. Outcomes: Interested, Callback (date/time required), No answer, Bad number, Remove.
 
 Later visits: tap **Unlock with Face ID / Touch ID**. The lock screen calls `GET {APPROVAL_PROXY_URL}/health`. If `registration_open` is `false` or `credential_count >= max_credentials`, **Register this device** is hidden — only Unlock is shown. Do not publish leads on GitHub Pages.
 
@@ -38,6 +38,16 @@ This site is a **static export**. Anything in the client bundle, `public/`, or c
 
 ```
 GET ${APPROVAL_PROXY_URL}/batch
+Authorization: Bearer <session_token>
+X-Session-Token: <session_token>
+```
+
+The **Email** tab shows that list filtered to public-email shops only.
+
+The **Call** tab loads a separate feed (same session headers):
+
+```
+GET ${APPROVAL_PROXY_URL}/call-queue
 Authorization: Bearer <session_token>
 X-Session-Token: <session_token>
 ```
@@ -94,9 +104,9 @@ Each lead:
 | `business_name` | yes | Card title. |
 | `niche` | yes | Shown as `niche · city`. |
 | `city` | yes | Shown as `niche · city`. |
-| `phone` | no | Shown if present; `tel:` link. Phone-only shops (no public email) go on the **Call** tab. |
+| `phone` | no | Shown if present; `tel:` link. |
 | `email` | no | Public email. Non-empty `email` or `email_if_public_business` puts the shop on the **Email** tab. |
-| `email_if_public_business` | no | Alternate public-email field. Treated like `email` for tab filtering. |
+| `email_if_public_business` | no | Alternate public-email field. Treated like `email` for Email-tab filtering. |
 | `why` | yes | Plain shop-owner English under **Why we're contacting**. |
 | `website_url` | no | **Site** verify pill. |
 | `maps_url` | no | **Maps** verify pill (a Maps search is built from name + city if omitted). |
@@ -104,10 +114,10 @@ Each lead:
 
 The page always adds a **Google** verify pill from name + city.
 
-After unlock, the batch is filtered **client-side** from authenticated `GET /batch` (GitHub Pages cannot read Scout’s box):
+After unlock, the tabs load **separate authenticated feeds**:
 
-- **Email tab** — non-empty public email (`email` or `email_if_public_business`). Phone-only shops never appear here. **Accept** / **Skip** only.
-- **Call tab** — phone-only: has phone, no public email, and `status` is not skip. That filter is the Call queue on this page. Scout’s ops file `shared/local-web/call-queue.csv` lives **on the Scout box** (not in this repo). Cos/proxy may later serve that queue as `GET /batch` (or a dedicated call-queue endpoint); until then, the client phone-only filter of `/batch` is the source. If Scout’s current call queue is 58 shops, the Call tab should show those same phone-only rows.
+- **Email tab** — authenticated `GET /batch`, then keep rows with a public email (`email` or `email_if_public_business`). Phone-only shops never appear here. **Accept** / **Skip** only.
+- **Call tab** — authenticated `GET /call-queue` with the same session headers. The page does **not** build this list by filtering `/batch`. Scout’s ops file `shared/local-web/call-queue.csv` lives **on the Scout box**; the proxy serves that queue as JSON on `/call-queue`.
 
   | Button | `action` |
   | --- | --- |
@@ -198,10 +208,11 @@ The live proxy is the Cloudflare tunnel above. It must:
   | `POST /webauthn/register/verify` | no | Verify attestation. First-time enroll of Allen’s device. |
   | `POST /webauthn/login/options` | no | Create assertion options. |
   | `POST /webauthn/login/verify` | no | Verify assertion. Return `{ "session_token": "..." }`. |
-  | `GET /batch` | session | Return the current batch JSON. Call tab filters this client-side for phone-only shops (has phone, no public email, status not skip). Optional later: serve Scout’s `shared/local-web/call-queue.csv` from the box instead. |
+  | `GET /batch` | session | Return the current batch JSON. Email tab filters this client-side to public-email shops. |
+  | `GET /call-queue` | session | Return the call-queue JSON (from Scout’s `shared/local-web/call-queue.csv` on the box). Call tab renders this feed; it does not filter `/batch`. |
   | `POST /decision` | session | Email Accept/Skip or Call outcomes above; forward to Cursor **server-side** with the sender key. |
 
-- Reject `GET /batch` and `POST /decision` without a valid session (`401` `unauthorized`, or `401` `batch_changed` when the published batch has moved on).
+- Reject `GET /batch`, `GET /call-queue`, and `POST /decision` without a valid session (`401` `unauthorized`, or `401` `batch_changed` when the published batch has moved on).
 - Restrict passkey registration to Allen’s allowlist and cap (`max_credentials`). When full, `registration_open` is `false` and `POST /webauthn/register/options` returns `403`.
 
 Override the base URL with GitHub Actions variable `APPROVAL_PROXY_URL` if the tunnel host changes. Deploy inlines it as `NEXT_PUBLIC_APPROVAL_PROXY_URL`.

@@ -8,17 +8,21 @@ import {
   APPROVAL_PROXY_URL,
   assertPrivateBatchUrl,
   buildDecisionPayload,
+  emailableLeads,
   extractSessionToken,
   fetchAuthenticatedBatch,
+  fetchAuthenticatedCallQueue,
   fetchEnrollmentStatus,
   getApprovalBatchEndpoint,
+  getApprovalCallQueueEndpoint,
   getApprovalHealthEndpoint,
   getApprovalProxyEndpoint,
   getApprovalProxyPath,
   getApprovalProxyUrl,
+  isEmailLead,
   isRegistrationAvailable,
   normalizeBatch,
-  partitionLeads,
+  normalizeCallQueue,
   proxyAuthErrorMessage,
   sessionHeaders,
   sessionInvalidKind,
@@ -40,17 +44,28 @@ describe('approval proxy paths', () => {
       'https://authorized-philip-mechanics-rick.trycloudflare.com',
     );
     assert.equal(
+      getApprovalBatchEndpoint(),
+      'https://authorized-philip-mechanics-rick.trycloudflare.com/batch',
+    );
+    assert.equal(
+      getApprovalCallQueueEndpoint(),
+      'https://authorized-philip-mechanics-rick.trycloudflare.com/call-queue',
+    );
+    assert.equal(
       getApprovalHealthEndpoint(),
       'https://authorized-philip-mechanics-rick.trycloudflare.com/health',
     );
   });
 
-  it('points batch and decision at the proxy, never public batch.json', () => {
+  it('points batch, call-queue, and decision at the proxy, never public batch.json', () => {
     const batch = getApprovalBatchEndpoint();
+    const queue = getApprovalCallQueueEndpoint();
     const decision = getApprovalProxyEndpoint();
     assert.match(batch, /\/batch$/);
+    assert.match(queue, /\/call-queue$/);
     assert.match(decision, /\/decision$/);
     assert.doesNotMatch(batch, /batch\.json/);
+    assert.doesNotMatch(queue, /batch\.json/);
     assert.doesNotMatch(decision, /batch\.json/);
     assert.equal(
       getApprovalProxyPath('webauthn/login/verify').endsWith(
@@ -74,6 +89,8 @@ describe('approval proxy paths', () => {
     );
     const allowed = getApprovalBatchEndpoint();
     assert.equal(assertPrivateBatchUrl(allowed), allowed);
+    const allowedQueue = getApprovalCallQueueEndpoint();
+    assert.equal(assertPrivateBatchUrl(allowedQueue), allowedQueue);
   });
 });
 
@@ -101,8 +118,8 @@ describe('session headers and tokens', () => {
   });
 });
 
-describe('email vs call lead filters', () => {
-  it('puts public-email leads on Email and phone-only on Call', () => {
+describe('email vs call feeds', () => {
+  it('Email tab keeps GET /batch filtered to public-email leads only', () => {
     const emailLead = {
       id: 'email-1',
       email: 'hello@example.com',
@@ -134,7 +151,7 @@ describe('email vs call lead filters', () => {
       phone: '',
       status: 'ready_for_outreach',
     };
-    const parts = partitionLeads([
+    const emailable = emailableLeads([
       emailLead,
       publicFieldLead,
       callLead,
@@ -142,21 +159,18 @@ describe('email vs call lead filters', () => {
       neither,
     ]);
     assert.deepEqual(
-      parts.email.map((lead) => lead.id),
+      emailable.map((lead) => lead.id),
       ['email-1', 'email-2'],
     );
-    assert.deepEqual(
-      parts.call.map((lead) => lead.id),
-      ['call-1'],
-    );
+    assert.equal(isEmailLead(callLead), false);
+    assert.equal(isEmailLead(skipPhone), false);
   });
 
   it('never places phone-only leads on the Email tab', () => {
-    const parts = partitionLeads([
+    const emailable = emailableLeads([
       { id: 'phone', phone: '512-555-0100', email: null, status: 'ready' },
     ]);
-    assert.equal(parts.email.length, 0);
-    assert.equal(parts.call.length, 1);
+    assert.equal(emailable.length, 0);
   });
 });
 
@@ -236,7 +250,7 @@ describe('decision payload', () => {
   });
 });
 
-describe('batch normalization', () => {
+describe('batch and call-queue normalization', () => {
   it('accepts a raw batch or { batch } wrapper', () => {
     const raw = normalizeBatch({
       batch_id: 'x',
@@ -249,6 +263,25 @@ describe('batch normalization', () => {
     });
     assert.equal(wrapped.batch_id, 'y');
     assert.deepEqual(wrapped.leads, []);
+  });
+
+  it('accepts call-queue leads, queue, or a raw array', () => {
+    const fromLeads = normalizeCallQueue({
+      batch_id: 'q',
+      leads: [{ id: 'c1' }],
+    });
+    assert.equal(fromLeads.batch_id, 'q');
+    assert.equal(fromLeads.leads[0].id, 'c1');
+
+    const fromQueue = normalizeCallQueue({
+      queue_id: 'ops',
+      queue: [{ id: 'c2' }],
+    });
+    assert.equal(fromQueue.batch_id, 'ops');
+    assert.equal(fromQueue.leads[0].id, 'c2');
+
+    const fromArray = normalizeCallQueue([{ id: 'c3' }]);
+    assert.equal(fromArray.leads[0].id, 'c3');
   });
 });
 
@@ -276,14 +309,17 @@ describe('public batch.json placeholder', () => {
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
     assert.doesNotMatch(utils, /export const APPROVE_BATCH_URL/);
     assert.match(utils, /fetchAuthenticatedBatch/);
+    assert.match(utils, /fetchAuthenticatedCallQueue/);
     assert.match(utils, /fetchEnrollmentStatus/);
     assert.match(client, /canRegister/);
     assert.match(client, /handleSessionInvalid/);
-    assert.match(client, /partitionLeads/);
+    assert.match(client, /emailableLeads/);
+    assert.match(client, /fetchAuthenticatedCallQueue/);
+    assert.doesNotMatch(client, /partitionLeads/);
     assert.match(client, /Email/);
     assert.match(client, /Call/);
     assert.match(client, /No email leads in this batch/);
-    assert.match(client, /No call leads in this batch/);
+    assert.match(client, /No call leads in the queue/);
     assert.match(client, /Interested/);
     assert.match(client, /Callback/);
     assert.match(client, /No answer/);
@@ -300,16 +336,19 @@ describe('public batch.json placeholder', () => {
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
   });
 
-  it('documents Call tab as a /batch phone-only filter, not a Pages-hosted queue file', () => {
+  it('documents Call tab as GET /call-queue with session headers, not a /batch filter', () => {
     const docs = readFileSync(path.join(root, 'APPROVE.md'), 'utf8');
+    assert.match(docs, /GET \$\{APPROVAL_PROXY_URL\}\/call-queue/);
     assert.match(docs, /shared\/local-web\/call-queue\.csv/);
-    assert.match(docs, /cannot read Scout/);
+    assert.match(docs, /does \*\*not\*\* build this list by filtering/);
     const client = readFileSync(
       path.join(root, 'app/approve/ApproveClient.js'),
       'utf8',
     );
     assert.doesNotMatch(client, /call-queue\.csv/);
-    assert.match(client, /partitionLeads/);
+    assert.match(client, /fetchAuthenticatedCallQueue/);
+    assert.match(client, /emailableLeads/);
+    assert.doesNotMatch(client, /partitionLeads/);
   });
 });
 
@@ -465,6 +504,41 @@ describe('proxy fetches', () => {
     assert.equal(result.reason, 'batch_changed');
     assert.equal(sessionInvalidKind(result), 'batch_changed');
     assert.match(sessionInvalidMessage(sessionInvalidKind(result)), /Unlock/);
+  });
+
+  it('loads GET /call-queue with session headers and does not hit /batch', async () => {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({
+        url: String(url),
+        method: init?.method || 'GET',
+        headers: init?.headers || {},
+      });
+      return jsonResponse(200, {
+        batch_id: 'call-ops',
+        leads: [{ id: 'queue-1', business_name: 'Queue Shop', phone: '512-555-0199' }],
+      });
+    };
+    const result = await fetchAuthenticatedCallQueue('sess-allen-1');
+    assert.equal(result.ok, true);
+    assert.equal(result.batch.batch_id, 'call-ops');
+    assert.equal(result.batch.leads[0].id, 'queue-1');
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /\/call-queue$/);
+    assert.doesNotMatch(calls[0].url, /\/batch$/);
+    assert.equal(calls[0].headers.Authorization, 'Bearer sess-allen-1');
+    assert.equal(calls[0].headers['X-Session-Token'], 'sess-allen-1');
+  });
+
+  it('treats GET /call-queue 401 unauthorized as a session error', async () => {
+    globalThis.fetch = async (url) => {
+      assert.match(String(url), /\/call-queue$/);
+      return jsonResponse(401, { ok: false, error: 'unauthorized' });
+    };
+    const result = await fetchAuthenticatedCallQueue('sess-old');
+    assert.equal(result.ok, false);
+    assert.equal(result.unauthorized, true);
+    assert.equal(sessionInvalidKind(result), 'unauthorized');
   });
 
   it('treats POST /decision 401 unauthorized as a session error', async () => {

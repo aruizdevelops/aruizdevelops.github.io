@@ -71,6 +71,38 @@ const TEST_BATCH = {
   ],
 };
 
+const TEST_CALL_QUEUE = {
+  batch_id: 'e2e-call-queue',
+  generated_at: '2026-09-18T18:00:00.000Z',
+  region: 'internal',
+  leads: [
+    {
+      id: 'queue-call-lead',
+      business_name: 'Queue Call Lead',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0299',
+      email: '',
+      why: 'Served from GET /call-queue, not a /batch filter.',
+      website_url: '',
+      maps_url: '',
+      status: 'ready_for_outreach',
+    },
+    {
+      id: 'queue-callback-lead',
+      business_name: 'Queue Callback Lead',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0288',
+      email: '',
+      why: 'Served from GET /call-queue, not a /batch filter.',
+      website_url: '',
+      maps_url: '',
+      status: 'ready_for_outreach',
+    },
+  ],
+};
+
 function b64url(buf) {
   return Buffer.from(buf).toString('base64url');
 }
@@ -133,6 +165,7 @@ async function startMockProxy() {
     loginCalls: 0,
     healthCalls: 0,
     batchCalls: 0,
+    callQueueCalls: 0,
   };
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -233,6 +266,20 @@ async function startMockProxy() {
           return;
         }
         json(res, 200, TEST_BATCH);
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/call-queue') {
+        state.callQueueCalls += 1;
+        if (state.batchError) {
+          json(res, 401, { ok: false, error: state.batchError });
+          return;
+        }
+        if (sessionFrom(req) !== SESSION_TOKEN) {
+          json(res, 401, { error: 'unauthorized' });
+          return;
+        }
+        json(res, 200, TEST_CALL_QUEUE);
         return;
       }
 
@@ -387,14 +434,23 @@ async function main() {
       timeout: 5000,
     });
     const callNames = await page.locator('.approve-name').allTextContents();
-    if (!callNames.some((text) => /Internal Call Lead/.test(text))) {
-      failures.push(`Call tab missing phone-only lead: ${callNames.join(' | ')}`);
+    if (!callNames.some((text) => /Queue Call Lead/.test(text))) {
+      failures.push(`Call tab missing /call-queue lead: ${callNames.join(' | ')}`);
+    }
+    if (!callNames.some((text) => /Queue Callback Lead/.test(text))) {
+      failures.push(`Call tab missing queue callback lead: ${callNames.join(' | ')}`);
     }
     if (callNames.some((text) => /Internal Email Lead/.test(text))) {
       failures.push('Email lead leaked onto Call tab');
     }
+    if (callNames.some((text) => /Internal Call Lead/.test(text))) {
+      failures.push('Call tab used GET /batch phone-only filter instead of /call-queue');
+    }
     if (callNames.some((text) => /Internal Skip Phone/.test(text))) {
       failures.push('skip-status phone lead appeared on Call tab');
+    }
+    if (state.callQueueCalls < 1) {
+      failures.push('Call tab never requested GET /call-queue');
     }
     if ((await page.getByRole('button', { name: 'Accept' }).count()) !== 0) {
       failures.push('Accept shown on Call tab');
@@ -429,7 +485,7 @@ async function main() {
     await page.waitForSelector('.approve-done-bar', { timeout: 10000 });
     if (decisions.length !== 2) {
       failures.push(`expected Interested decision, got ${decisions.length}`);
-    } else if (decisions[1].action !== 'interested' || decisions[1].lead_id !== 'internal-call-lead') {
+    } else if (decisions[1].action !== 'interested' || decisions[1].lead_id !== 'queue-call-lead') {
       failures.push(`bad interested payload ${JSON.stringify(decisions[1])}`);
     } else if (Object.keys(decisions[1]).sort().join(',') !== 'action,batch_id,business_name,lead_id') {
       failures.push(`interested extra keys ${Object.keys(decisions[1])}`);
@@ -437,7 +493,7 @@ async function main() {
     await shot('approve_call_interested.png');
 
     const callbackLead = page.locator('.approve-card').filter({
-      hasText: 'Internal Callback Lead',
+      hasText: 'Queue Callback Lead',
     });
     await callbackLead.locator('input[type="datetime-local"]').fill('2026-09-20T10:30');
     await callbackLead.getByRole('button', { name: 'Callback' }).click();
@@ -446,7 +502,7 @@ async function main() {
       failures.push(`expected Callback decision, got ${decisions.length}`);
     } else {
       const body = decisions[2];
-      if (body.action !== 'callback' || body.lead_id !== 'internal-callback-lead') {
+      if (body.action !== 'callback' || body.lead_id !== 'queue-callback-lead') {
         failures.push(`bad callback payload ${JSON.stringify(body)}`);
       }
       if (!body.callback_at || Number.isNaN(Date.parse(body.callback_at))) {

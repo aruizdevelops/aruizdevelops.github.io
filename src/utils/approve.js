@@ -61,6 +61,10 @@ export function getApprovalBatchEndpoint() {
   return getApprovalProxyPath('batch');
 }
 
+export function getApprovalCallQueueEndpoint() {
+  return getApprovalProxyPath('call-queue');
+}
+
 export function getApprovalHealthEndpoint() {
   return getApprovalProxyPath('health');
 }
@@ -221,10 +225,14 @@ export function isCallLead(lead) {
   return hasPhone(lead) && !isEmailLead(lead) && !isSkipStatus(lead);
 }
 
+export function emailableLeads(leads) {
+  return (Array.isArray(leads) ? leads : []).filter(isEmailLead);
+}
+
 export function partitionLeads(leads) {
   const list = Array.isArray(leads) ? leads : [];
   return {
-    email: list.filter(isEmailLead),
+    email: emailableLeads(list),
     call: list.filter(isCallLead),
   };
 }
@@ -601,6 +609,37 @@ export function normalizeBatch(data) {
   };
 }
 
+function callQueueLeadList(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== 'object') return null;
+  if (Array.isArray(data.leads)) return data.leads;
+  if (Array.isArray(data.queue)) return data.queue;
+  if (Array.isArray(data.call_queue)) return data.call_queue;
+  if (Array.isArray(data.shops)) return data.shops;
+  if (data.batch && typeof data.batch === 'object') {
+    return callQueueLeadList(data.batch);
+  }
+  return null;
+}
+
+export function normalizeCallQueue(data) {
+  if (Array.isArray(data)) {
+    return { batch_id: '', leads: data };
+  }
+  if (!data || typeof data !== 'object') return null;
+  const leads = callQueueLeadList(data);
+  if (!leads) return null;
+  const raw =
+    data.batch && typeof data.batch === 'object' && !Array.isArray(data.leads)
+      ? data.batch
+      : data;
+  return {
+    ...raw,
+    batch_id: raw.batch_id || raw.batchId || raw.queue_id || raw.queueId || '',
+    leads,
+  };
+}
+
 export function assertPrivateBatchUrl(url) {
   const value = String(url || '');
   if (!value) {
@@ -616,8 +655,8 @@ export function assertPrivateBatchUrl(url) {
   return value;
 }
 
-export async function fetchAuthenticatedBatch(token) {
-  const url = getApprovalBatchEndpoint();
+async function fetchAuthenticatedLeadFeed(path, token, normalize) {
+  const url = getApprovalProxyPath(path);
   if (!url) {
     return { ok: false, reason: 'proxy-not-configured' };
   }
@@ -652,7 +691,7 @@ export async function fetchAuthenticatedBatch(token) {
         reason: `http-${response.status}`,
       };
     }
-    const batch = normalizeBatch(data);
+    const batch = normalize(data);
     if (!batch) {
       return { ok: false, status: response.status, reason: 'invalid-batch' };
     }
@@ -663,6 +702,14 @@ export async function fetchAuthenticatedBatch(token) {
     }
     return { ok: false, reason: 'network' };
   }
+}
+
+export function fetchAuthenticatedBatch(token) {
+  return fetchAuthenticatedLeadFeed('batch', token, normalizeBatch);
+}
+
+export function fetchAuthenticatedCallQueue(token) {
+  return fetchAuthenticatedLeadFeed('call-queue', token, normalizeCallQueue);
 }
 
 function verifyPayload(credential, optionsResponse) {

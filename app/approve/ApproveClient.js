@@ -10,8 +10,10 @@ import {
   clearSessionToken,
   decisionTone,
   EMAIL_ACTIONS,
+  emailableLeads,
   enrollDevice,
   fetchAuthenticatedBatch,
+  fetchAuthenticatedCallQueue,
   fetchEnrollmentStatus,
   formatBatchDate,
   formatCallbackWhen,
@@ -23,7 +25,6 @@ import {
   isApprovalProxyConfigured,
   isWebAuthnSupported,
   openMailto,
-  partitionLeads,
   proxyAuthErrorMessage,
   readDeviceEnrolled,
   readDecisionStore,
@@ -352,7 +353,10 @@ function LockPanel({
 export default function ApproveClient() {
   const [gate, setGate] = useState('checking');
   const [batch, setBatch] = useState(null);
+  const [callQueue, setCallQueue] = useState(null);
   const [loadState, setLoadState] = useState('idle');
+  const [emailLoad, setEmailLoad] = useState('idle');
+  const [callLoad, setCallLoad] = useState('idle');
   const [store, setStore] = useState({});
   const [busyId, setBusyId] = useState('');
   const [mailtoByLead, setMailtoByLead] = useState({});
@@ -368,7 +372,10 @@ export default function ApproveClient() {
   const handleSessionInvalid = useCallback((result) => {
     clearSessionToken();
     setBatch(null);
+    setCallQueue(null);
     setLoadState('idle');
+    setEmailLoad('idle');
+    setCallLoad('idle');
     setGate('locked');
     setTab('email');
     setEnrolled(true);
@@ -376,20 +383,27 @@ export default function ApproveClient() {
     setAuthError(sessionInvalidMessage(sessionInvalidKind(result)));
   }, []);
 
-  const loadBatchWithToken = useCallback(async (token) => {
+  const loadFeedsWithToken = useCallback(async (token) => {
     setLoadState('loading');
-    const result = await fetchAuthenticatedBatch(token);
-    if (result.unauthorized) {
-      handleSessionInvalid(result);
+    setEmailLoad('loading');
+    setCallLoad('loading');
+    const [batchResult, queueResult] = await Promise.all([
+      fetchAuthenticatedBatch(token),
+      fetchAuthenticatedCallQueue(token),
+    ]);
+    if (batchResult.unauthorized || queueResult.unauthorized) {
+      handleSessionInvalid(batchResult.unauthorized ? batchResult : queueResult);
       return false;
     }
-    if (!result.ok) {
-      setBatch(null);
+    setBatch(batchResult.ok ? batchResult.batch : null);
+    setCallQueue(queueResult.ok ? queueResult.batch : null);
+    setEmailLoad(batchResult.ok ? 'ready' : 'error');
+    setCallLoad(queueResult.ok ? 'ready' : 'error');
+    if (!batchResult.ok && !queueResult.ok) {
       setLoadState('error');
       setGate('open');
       return false;
     }
-    setBatch(result.batch);
     setStore(readDecisionStore());
     setLoadState('ready');
     setGate('open');
@@ -423,32 +437,22 @@ export default function ApproveClient() {
         return;
       }
 
-      const result = await fetchAuthenticatedBatch(token);
-      if (cancelled) return;
-      if (result.unauthorized) {
-        handleSessionInvalid(result);
-        return;
-      }
-      if (!result.ok) {
-        clearSessionToken();
-        setGate('locked');
-        return;
-      }
-      setBatch(result.batch);
-      setStore(readDecisionStore());
-      setLoadState('ready');
-      setGate('open');
+      await loadFeedsWithToken(token);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [handleSessionInvalid]);
+  }, [handleSessionInvalid, loadFeedsWithToken]);
 
-  const leads = Array.isArray(batch?.leads) ? batch.leads : [];
-  const batchId = batch?.batch_id || '';
-  const lists = useMemo(() => partitionLeads(leads), [leads]);
-  const visibleLeads = tab === 'call' ? lists.call : lists.email;
+  const emailLeads = useMemo(
+    () => emailableLeads(batch?.leads),
+    [batch],
+  );
+  const callLeads = Array.isArray(callQueue?.leads) ? callQueue.leads : [];
+  const visibleLeads = tab === 'call' ? callLeads : emailLeads;
+  const activeFeed = tab === 'call' ? callQueue : batch;
+  const batchId = activeFeed?.batch_id || '';
 
   const stats = useMemo(() => {
     const ready = visibleLeads.filter((lead) =>
@@ -508,23 +512,24 @@ export default function ApproveClient() {
           setAuthError(proxyAuthErrorMessage({ reason: 'missing-session-token' }));
           return;
         }
-        await loadBatchWithToken(token);
+        await loadFeedsWithToken(token);
       } catch (error) {
         setAuthError(webAuthnErrorMessage(error));
       } finally {
         setAuthBusy(false);
       }
     },
-    [authBusy, loadBatchWithToken],
+    [authBusy, loadFeedsWithToken],
   );
 
   const handleDecide = useCallback(
     async (lead, action, extra = {}) => {
-      if (!batch || busyId) return;
+      const source = tab === 'call' ? callQueue : batch;
+      if (!source || busyId) return;
       const allowed =
         tab === 'call' ? CALL_ACTIONS.has(action) : EMAIL_ACTIONS.has(action);
       if (!allowed) return;
-      if (getLeadDecision(store, batch.batch_id, lead.id)) return;
+      if (getLeadDecision(store, source.batch_id, lead.id)) return;
 
       if (action === 'callback' && !toIsoDatetime(extra.callbackAt)) {
         setErrorsByLead((prev) => ({
@@ -550,7 +555,7 @@ export default function ApproveClient() {
         const result = await submitLeadDecision({
           action,
           lead,
-          batch,
+          batch: source,
           token: readSessionToken(),
           callbackAt: extra.callbackAt,
         });
@@ -591,12 +596,12 @@ export default function ApproveClient() {
         const mailtoHref = buildDecisionMailto({
           action,
           lead,
-          batchId: batch.batch_id,
+          batchId: source.batch_id,
           callbackAt: extra.callbackAt,
         });
         setStore(
           storeLeadDecision({
-            batchId: batch.batch_id,
+            batchId: source.batch_id,
             leadId: lead.id,
             action,
             callbackAt: extra.callbackAt,
@@ -608,20 +613,24 @@ export default function ApproveClient() {
         setBusyId('');
       }
     },
-    [batch, busyId, handleSessionInvalid, store, tab],
+    [batch, busyId, callQueue, handleSessionInvalid, store, tab],
   );
 
-  const dateLabel = formatBatchDate(batch?.generated_at, batch?.batch_id);
+  const dateLabel = formatBatchDate(
+    activeFeed?.generated_at,
+    activeFeed?.batch_id,
+  );
   const locked = gate !== 'open';
   const subtitleParts = locked
     ? ['Unlock with Face ID / Touch ID']
     : [
         dateLabel,
-        batch?.region,
+        activeFeed?.region,
         tab === 'call'
-          ? 'phone-only · tap an outcome after you call'
+          ? 'call queue · tap an outcome after you call'
           : 'tap Accept or Skip as you check',
       ].filter(Boolean);
+  const tabLoad = tab === 'call' ? callLoad : emailLoad;
 
   return (
     <div className="approve-root">
@@ -638,16 +647,17 @@ export default function ApproveClient() {
                     ? 'Checking this device…'
                     : "Locked. Only Allen's registered device can open this batch."}
                 </>
-              ) : loadState === 'ready' ? (
+              ) : loadState === 'ready' && tabLoad === 'ready' ? (
                 <SummaryText
                   stats={stats}
                   total={visibleLeads.length}
                   tab={tab}
                 />
-              ) : loadState === 'error' ? (
+              ) : loadState === 'error' || tabLoad === 'error' ? (
                 <>
-                  Could not load this batch from the approval proxy. Unlock
-                  again, or ask Scout to publish the list.
+                  {tab === 'call'
+                    ? 'Could not load the call queue from the approval proxy. Unlock again, or ask Scout to publish it.'
+                    : 'Could not load this batch from the approval proxy. Unlock again, or ask Scout to publish the list.'}
                 </>
               ) : (
                 <>Loading this batch…</>
@@ -660,7 +670,10 @@ export default function ApproveClient() {
                 onClick={() => {
                   clearSessionToken();
                   setBatch(null);
+                  setCallQueue(null);
                   setLoadState('idle');
+                  setEmailLoad('idle');
+                  setCallLoad('idle');
                   setGate('locked');
                   setTab('email');
                   setAuthError('');
@@ -683,7 +696,7 @@ export default function ApproveClient() {
                 onClick={() => setTab('email')}
               >
                 Email
-                <span className="approve-tab-count">{lists.email.length}</span>
+                <span className="approve-tab-count">{emailLeads.length}</span>
               </button>
               <button
                 type="button"
@@ -695,7 +708,7 @@ export default function ApproveClient() {
                 onClick={() => setTab('call')}
               >
                 Call
-                <span className="approve-tab-count">{lists.call.length}</span>
+                <span className="approve-tab-count">{callLeads.length}</span>
               </button>
             </div>
           ) : null}
@@ -727,12 +740,24 @@ export default function ApproveClient() {
               />
             ) : loadState === 'error' ? (
               <div className="approve-status-msg">
-                <strong>Batch unavailable</strong>
-                Unlock again, or wait for Scout to publish the next pack to the
-                approval proxy.
+                <strong>Leads unavailable</strong>
+                Unlock again, or wait for Scout to publish the next pack and
+                call queue to the approval proxy.
               </div>
             ) : loadState === 'loading' ? (
               <div className="approve-status-msg">Loading leads…</div>
+            ) : tab === 'call' && callLoad === 'error' ? (
+              <div className="approve-status-msg">
+                <strong>Call queue unavailable</strong>
+                Could not load GET /call-queue from the approval proxy. Unlock
+                again, or wait for Scout to publish the queue.
+              </div>
+            ) : tab === 'email' && emailLoad === 'error' ? (
+              <div className="approve-status-msg">
+                <strong>Batch unavailable</strong>
+                Could not load email leads from GET /batch. Unlock again, or
+                wait for Scout to publish the next pack.
+              </div>
             ) : visibleLeads.length === 0 ? (
               <EmptyTab tab={tab} />
             ) : (
@@ -765,17 +790,17 @@ function EmptyTab({ tab }) {
   if (tab === 'call') {
     return (
       <div className="approve-status-msg">
-        <strong>No call leads in this batch</strong>
-        There are no phone-only shops to call. Check the Email tab, or wait for
-        Scout to publish the next pack.
+        <strong>No call leads in the queue</strong>
+        The call queue is empty. Check the Email tab, or wait for Scout to
+        publish the next queue.
       </div>
     );
   }
   return (
     <div className="approve-status-msg">
       <strong>No email leads in this batch</strong>
-      None of these shops have a public email. Check the Call tab for
-      phone-only shops, or wait for Scout to publish the next pack.
+      None of these shops have a public email. Check the Call tab, or wait for
+      Scout to publish the next pack.
     </div>
   );
 }
@@ -798,13 +823,13 @@ function SummaryText({ stats, total, tab }) {
 
   if (tab === 'call') {
     if (total === 0) {
-      return <>No phone-only shops in this batch.</>;
+      return <>No shops in the call queue.</>;
     }
     const topLine =
       remaining === 0
         ? `All ${total} reviewed · ${interested} interested · ${callback} callback`
         : remaining === total
-          ? `${total} phone-only shop${total === 1 ? '' : 's'}`
+          ? `${total} call-queue shop${total === 1 ? '' : 's'}`
           : `${remaining} remaining · ${interested} interested · ${callback} callback`;
     const extra = [
       noAnswer ? `${noAnswer} no answer` : '',

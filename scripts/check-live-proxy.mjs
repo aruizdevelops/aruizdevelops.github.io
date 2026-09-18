@@ -46,6 +46,11 @@ async function main() {
   assert.equal(batch.data.ok, false);
   assert.equal(batch.data.error, 'unauthorized');
 
+  const queue = await getJson(`${PROXY}/call-queue`);
+  assert.equal(queue.status, 401);
+  assert.equal(queue.data.ok, false);
+  assert.equal(queue.data.error, 'unauthorized');
+
   const options = await getJson(`${PROXY}/webauthn/register/options`, {
     method: 'POST',
     headers: {
@@ -100,6 +105,7 @@ async function main() {
         max_credentials: health.data.max_credentials,
         registration_open: health.data.registration_open,
         batch_unauthorized: batch.status === 401,
+        call_queue_unauthorized: queue.status === 401,
         register_options: options.status,
         rp_id: options.data.rp?.id,
         public_leads: publicBatch.leads.length,
