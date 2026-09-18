@@ -48,6 +48,8 @@ jobs:
         env:
           # Optional public Formspree / Apps Script / webhook URL. See UNSUBSCRIBE.md.
           NEXT_PUBLIC_UNSUBSCRIBE_ENDPOINT: ${{ vars.UNSUBSCRIBE_ENDPOINT }}
+          # Public approval proxy base URL only. Never a sender key. See APPROVE.md.
+          NEXT_PUBLIC_APPROVAL_PROXY_URL: ${{ vars.APPROVAL_PROXY_URL || 'https://authorized-philip-mechanics-rick.trycloudflare.com' }}
         run: npm run build
 
       - name: Setup Pages
