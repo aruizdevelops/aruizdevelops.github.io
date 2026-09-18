@@ -3,7 +3,7 @@ import ApproveClient from './ApproveClient';
 export const metadata = {
   title: 'Daily Approvals | Texas Craft Sites',
   description:
-    'Review Texas Craft Sites scout batches. Tap Accept or Skip as you check each shop.',
+    'Review Texas Craft Sites scout batches. Email tab: Accept or Skip. Call tab is a phone-only review list.',
   robots: {
     index: false,
     follow: false,

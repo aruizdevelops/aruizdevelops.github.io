@@ -16,7 +16,9 @@ Email Allen that link when a batch is ready. The page is an internal review UI (
 2. Tap **Register this device**.
 3. Complete Face ID / Touch ID (platform authenticator).
 4. If the page still shows the lock screen, tap **Unlock with Face ID / Touch ID**.
-5. Lead cards load from the proxy. Accept / Skip as usual.
+5. Lead cards load from the proxy. After unlock, **Email** and **Call** tabs split the batch:
+   - **Email** — shops with a public email (`email` or `email_if_public_business`). Accept / Skip as usual.
+   - **Call** — phone-only shops (has phone, no public email; `status` skip excluded). Read-only until call outcome buttons are locked.
 
 Later visits: tap **Unlock with Face ID / Touch ID**. The lock screen calls `GET {APPROVAL_PROXY_URL}/health`. If `registration_open` is `false` or `credential_count >= max_credentials`, **Register this device** is hidden — only Unlock is shown. Do not publish leads on GitHub Pages.
 
@@ -92,8 +94,9 @@ Each lead:
 | `business_name` | yes | Card title. |
 | `niche` | yes | Shown as `niche · city`. |
 | `city` | yes | Shown as `niche · city`. |
-| `phone` | no | Shown if present; `tel:` link. |
-| `email` | no | Shown next to phone if present. |
+| `phone` | no | Shown if present; `tel:` link. Phone-only shops (no public email) go on the **Call** tab. |
+| `email` | no | Public email. Non-empty `email` or `email_if_public_business` puts the shop on the **Email** tab. |
+| `email_if_public_business` | no | Alternate public-email field. Treated like `email` for tab filtering. |
 | `why` | yes | Plain shop-owner English under **Why we're contacting**. |
 | `website_url` | no | **Site** verify pill. |
 | `maps_url` | no | **Maps** verify pill (a Maps search is built from name + city if omitted). |
@@ -101,9 +104,14 @@ Each lead:
 
 The page always adds a **Google** verify pill from name + city.
 
+After unlock, the batch is filtered **client-side**:
+
+- **Email tab** — non-empty public email (`email` or `email_if_public_business`). Phone-only shops never appear here.
+- **Call tab** — has phone, no public email, and `status` is not skip. Read-only for now; outcome buttons are not shipped until Allen locks them.
+
 ## How a decision is recorded
 
-On **Accept** or **Skip** (only after unlock):
+On **Accept** or **Skip** on the **Email** tab (only after unlock):
 
 1. The page POSTs JSON to:
 
@@ -137,7 +145,7 @@ On **Accept** or **Skip** (only after unlock):
    }
    ```
 
-   `action` is `approve` or `skip`.
+   `action` is `approve` or `skip`. The Call tab does not POST a decision yet.
 
 3. On a successful proxy POST, the card is marked done in `localStorage` (`tcs-lead-approvals`, keyed by `batch_id` + lead `id`). That is device-only.
 

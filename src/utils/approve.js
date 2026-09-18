@@ -112,6 +112,41 @@ export function formatCountLine(counts) {
     .join(' · ');
 }
 
+function fieldAsEmail(value) {
+  if (typeof value !== 'string') return '';
+  return sanitizeText(value, 200);
+}
+
+export function getPublicEmail(lead) {
+  return (
+    fieldAsEmail(lead?.email) || fieldAsEmail(lead?.email_if_public_business)
+  );
+}
+
+export function hasPhone(lead) {
+  return Boolean(sanitizeText(lead?.phone, 80));
+}
+
+export function isSkipStatus(lead) {
+  return formatStatusLabel(lead?.status).includes('skip');
+}
+
+export function isEmailLead(lead) {
+  return Boolean(getPublicEmail(lead));
+}
+
+export function isCallLead(lead) {
+  return hasPhone(lead) && !isEmailLead(lead) && !isSkipStatus(lead);
+}
+
+export function partitionLeads(leads) {
+  const list = Array.isArray(leads) ? leads : [];
+  return {
+    email: list.filter(isEmailLead),
+    call: list.filter(isCallLead),
+  };
+}
+
 export function buildVerifyLinks(lead) {
   const name = sanitizeText(lead?.business_name, 120);
   const city = sanitizeText(lead?.city, 80);

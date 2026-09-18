@@ -14,9 +14,11 @@ import {
   formatCountLine,
   formatStatusLabel,
   getLeadDecision,
+  getPublicEmail,
   isApprovalProxyConfigured,
   isWebAuthnSupported,
   openMailto,
+  partitionLeads,
   proxyAuthErrorMessage,
   readDeviceEnrolled,
   readDecisionStore,
@@ -33,7 +35,7 @@ import {
 import './approve.css';
 
 function contactLine(lead) {
-  const parts = [lead.phone, lead.email].filter(Boolean);
+  const parts = [lead.phone, getPublicEmail(lead)].filter(Boolean);
   return parts.join(' · ');
 }
 
@@ -45,6 +47,7 @@ function LeadCard({
   mailtoHref,
   error,
   onDecide,
+  readOnly,
 }) {
   const statusLabel = formatStatusLabel(
     decision?.action === 'approve'
@@ -62,6 +65,7 @@ function LeadCard({
   );
   const links = buildVerifyLinks(lead);
   const contact = contactLine(lead);
+  const email = getPublicEmail(lead);
   const done = Boolean(decision);
 
   return (
@@ -83,10 +87,8 @@ function LeadCard({
               {lead.phone}
             </a>
           ) : null}
-          {lead.phone && lead.email ? ' · ' : null}
-          {lead.email ? (
-            <a href={`mailto:${lead.email}`}>{lead.email}</a>
-          ) : null}
+          {lead.phone && email ? ' · ' : null}
+          {email ? <a href={`mailto:${email}`}>{email}</a> : null}
         </div>
       ) : null}
 
@@ -116,7 +118,9 @@ function LeadCard({
         </>
       ) : null}
 
-      {done ? (
+      {readOnly ? (
+        <p className="approve-readonly">Review only — outcomes coming</p>
+      ) : done ? (
         <>
           <div
             className={`approve-done-bar is-${decision.action === 'skip' ? 'skip' : 'accept'}`}
@@ -278,6 +282,7 @@ export default function ApproveClient() {
   const [enrolled, setEnrolled] = useState(false);
   const [canRegister, setCanRegister] = useState(true);
   const [supported, setSupported] = useState(true);
+  const [tab, setTab] = useState('email');
   const proxyConfigured = isApprovalProxyConfigured();
 
   const handleSessionInvalid = useCallback((result) => {
@@ -285,6 +290,7 @@ export default function ApproveClient() {
     setBatch(null);
     setLoadState('idle');
     setGate('locked');
+    setTab('email');
     setEnrolled(true);
     writeDeviceEnrolled(true);
     setAuthError(sessionInvalidMessage(sessionInvalidKind(result)));
@@ -361,23 +367,25 @@ export default function ApproveClient() {
 
   const leads = Array.isArray(batch?.leads) ? batch.leads : [];
   const batchId = batch?.batch_id || '';
+  const lists = useMemo(() => partitionLeads(leads), [leads]);
+  const visibleLeads = tab === 'call' ? lists.call : lists.email;
 
   const stats = useMemo(() => {
-    const ready = leads.filter((lead) =>
+    const ready = visibleLeads.filter((lead) =>
       formatStatusLabel(lead.status).includes('ready'),
     ).length;
-    const researching = leads.filter((lead) =>
+    const researching = visibleLeads.filter((lead) =>
       formatStatusLabel(lead.status).includes('research'),
     ).length;
-    const niches = countBy(leads, (lead) => lead.niche);
-    const decisions = leads.map((lead) =>
+    const niches = countBy(visibleLeads, (lead) => lead.niche);
+    const decisions = visibleLeads.map((lead) =>
       getLeadDecision(store, batchId, lead.id),
     );
     const accepted = decisions.filter((d) => d?.action === 'approve').length;
     const skipped = decisions.filter((d) => d?.action === 'skip').length;
-    const remaining = leads.length - accepted - skipped;
+    const remaining = visibleLeads.length - accepted - skipped;
     return { ready, researching, niches, accepted, skipped, remaining };
-  }, [leads, store, batchId]);
+  }, [visibleLeads, store, batchId]);
 
   const runAuth = useCallback(
     async (mode) => {
@@ -416,6 +424,7 @@ export default function ApproveClient() {
   const handleDecide = useCallback(
     async (lead, action) => {
       if (!batch || busyId) return;
+      if (tab === 'call') return;
       if (getLeadDecision(store, batch.batch_id, lead.id)) return;
 
       setBusyId(lead.id);
@@ -479,7 +488,7 @@ export default function ApproveClient() {
         setBusyId('');
       }
     },
-    [batch, busyId, handleSessionInvalid, store],
+    [batch, busyId, handleSessionInvalid, store, tab],
   );
 
   const dateLabel = formatBatchDate(batch?.generated_at, batch?.batch_id);
@@ -489,7 +498,9 @@ export default function ApproveClient() {
     : [
         dateLabel,
         batch?.region,
-        'tap Accept or Skip as you check',
+        tab === 'call'
+          ? 'phone-only list · outcomes coming'
+          : 'tap Accept or Skip as you check',
       ].filter(Boolean);
 
   return (
@@ -508,7 +519,11 @@ export default function ApproveClient() {
                     : "Locked. Only Allen's registered device can open this batch."}
                 </>
               ) : loadState === 'ready' ? (
-                <SummaryText stats={stats} total={leads.length} />
+                <SummaryText
+                  stats={stats}
+                  total={visibleLeads.length}
+                  tab={tab}
+                />
               ) : loadState === 'error' ? (
                 <>
                   Could not load this batch from the approval proxy. Unlock
@@ -527,6 +542,7 @@ export default function ApproveClient() {
                   setBatch(null);
                   setLoadState('idle');
                   setGate('locked');
+                  setTab('email');
                   setAuthError('');
                 }}
               >
@@ -535,7 +551,47 @@ export default function ApproveClient() {
             ) : null}
           </header>
 
-          <div className="approve-body">
+          {!locked && loadState === 'ready' ? (
+            <div className="approve-tabs" role="tablist" aria-label="Outreach type">
+              <button
+                type="button"
+                role="tab"
+                id="approve-tab-email"
+                aria-controls="approve-tabpanel"
+                aria-selected={tab === 'email'}
+                className={`approve-tab${tab === 'email' ? ' is-active' : ''}`}
+                onClick={() => setTab('email')}
+              >
+                Email
+                <span className="approve-tab-count">{lists.email.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="approve-tab-call"
+                aria-controls="approve-tabpanel"
+                aria-selected={tab === 'call'}
+                className={`approve-tab${tab === 'call' ? ' is-active' : ''}`}
+                onClick={() => setTab('call')}
+              >
+                Call
+                <span className="approve-tab-count">{lists.call.length}</span>
+              </button>
+            </div>
+          ) : null}
+
+          <div
+            className="approve-body"
+            id="approve-tabpanel"
+            role={!locked && loadState === 'ready' ? 'tabpanel' : undefined}
+            aria-labelledby={
+              !locked && loadState === 'ready'
+                ? tab === 'call'
+                  ? 'approve-tab-call'
+                  : 'approve-tab-email'
+                : undefined
+            }
+          >
             {gate === 'checking' ? (
               <div className="approve-status-msg">Checking this device…</div>
             ) : locked ? (
@@ -557,25 +613,32 @@ export default function ApproveClient() {
               </div>
             ) : loadState === 'loading' ? (
               <div className="approve-status-msg">Loading leads…</div>
-            ) : leads.length === 0 ? (
-              <div className="approve-status-msg">
-                <strong>No leads in this batch</strong>
-                Scout can publish the next list to the approval proxy when it is
-                ready.
-              </div>
+            ) : visibleLeads.length === 0 ? (
+              <EmptyTab tab={tab} />
             ) : (
-              leads.map((lead, index) => (
-                <LeadCard
-                  key={lead.id || index}
-                  lead={lead}
-                  index={index}
-                  decision={getLeadDecision(store, batchId, lead.id)}
-                  busy={busyId === lead.id}
-                  mailtoHref={mailtoByLead[lead.id]}
-                  error={errorsByLead[lead.id]}
-                  onDecide={handleDecide}
-                />
-              ))
+              <>
+                {tab === 'call' ? (
+                  <div className="approve-call-note">
+                    <strong>Call outcomes coming</strong>
+                    These shops have a phone and no public email. Outcome
+                    buttons are not on this tab yet — nothing is recorded from
+                    here.
+                  </div>
+                ) : null}
+                {visibleLeads.map((lead, index) => (
+                  <LeadCard
+                    key={lead.id || index}
+                    lead={lead}
+                    index={index}
+                    decision={getLeadDecision(store, batchId, lead.id)}
+                    busy={busyId === lead.id}
+                    mailtoHref={mailtoByLead[lead.id]}
+                    error={errorsByLead[lead.id]}
+                    onDecide={handleDecide}
+                    readOnly={tab === 'call'}
+                  />
+                ))}
+              </>
             )}
           </div>
 
@@ -588,12 +651,52 @@ export default function ApproveClient() {
   );
 }
 
-function SummaryText({ stats, total }) {
+function EmptyTab({ tab }) {
+  if (tab === 'call') {
+    return (
+      <div className="approve-status-msg">
+        <strong>No call leads in this batch</strong>
+        There are no phone-only shops to call. Check the Email tab, or wait for
+        Scout to publish the next pack.
+      </div>
+    );
+  }
+  return (
+    <div className="approve-status-msg">
+      <strong>No email leads in this batch</strong>
+      None of these shops have a public email. Check the Call tab for
+      phone-only shops, or wait for Scout to publish the next pack.
+    </div>
+  );
+}
+
+function SummaryText({ stats, total, tab }) {
   const { remaining, accepted, skipped, ready, researching, niches } = stats;
   const nicheLine = formatCountLine(niches);
 
+  if (tab === 'call') {
+    if (total === 0) {
+      return <>No phone-only shops in this batch.</>;
+    }
+    return (
+      <>
+        <strong>
+          {total} phone-only shop{total === 1 ? '' : 's'} · review only
+        </strong>
+        {nicheLine ? (
+          <>
+            <br />
+            {nicheLine}
+          </>
+        ) : null}
+        <br />
+        Call outcome buttons are coming. This tab does not record a decision.
+      </>
+    );
+  }
+
   if (total === 0) {
-    return <>No leads in this batch.</>;
+    return <>No email leads in this batch.</>;
   }
 
   const topLine =

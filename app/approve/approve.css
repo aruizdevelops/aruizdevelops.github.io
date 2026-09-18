@@ -374,3 +374,85 @@
 .approve-lock-again:focus-visible {
   color: #5eead4;
 }
+
+.approve-tabs {
+  display: flex;
+  gap: 0;
+  background: #0f172a;
+  padding: 0 10px;
+  border-left: 1px solid #0f172a;
+  border-right: 1px solid #0f172a;
+}
+
+.approve-tab {
+  flex: 1;
+  appearance: none;
+  cursor: pointer;
+  min-height: 46px;
+  padding: 12px 10px 10px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+
+.approve-tab.is-active {
+  color: #5eead4;
+  border-bottom-color: #5eead4;
+}
+
+.approve-tab:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: -4px;
+}
+
+.approve-tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+.approve-tab.is-active .approve-tab-count {
+  background: rgba(94, 234, 212, 0.18);
+}
+
+.approve-call-note {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 12px;
+  color: #0f766e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.approve-call-note strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.approve-readonly {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}

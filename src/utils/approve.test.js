@@ -18,6 +18,7 @@ import {
   getApprovalProxyUrl,
   isRegistrationAvailable,
   normalizeBatch,
+  partitionLeads,
   proxyAuthErrorMessage,
   sessionHeaders,
   sessionInvalidKind,
@@ -99,6 +100,65 @@ describe('session headers and tokens', () => {
   });
 });
 
+describe('email vs call lead filters', () => {
+  it('puts public-email leads on Email and phone-only on Call', () => {
+    const emailLead = {
+      id: 'email-1',
+      email: 'hello@example.com',
+      phone: '512-555-0100',
+      status: 'ready_for_outreach',
+    };
+    const publicFieldLead = {
+      id: 'email-2',
+      email: '',
+      email_if_public_business: 'owner@shop.com',
+      phone: '512-555-0101',
+      status: 'ready_for_outreach',
+    };
+    const callLead = {
+      id: 'call-1',
+      email: '',
+      phone: '512-555-0199',
+      status: 'ready_for_outreach',
+    };
+    const skipPhone = {
+      id: 'call-skip',
+      email: '',
+      phone: '512-555-0111',
+      status: 'skip',
+    };
+    const neither = {
+      id: 'neither',
+      email: '  ',
+      phone: '',
+      status: 'ready_for_outreach',
+    };
+    const parts = partitionLeads([
+      emailLead,
+      publicFieldLead,
+      callLead,
+      skipPhone,
+      neither,
+    ]);
+    assert.deepEqual(
+      parts.email.map((lead) => lead.id),
+      ['email-1', 'email-2'],
+    );
+    assert.deepEqual(
+      parts.call.map((lead) => lead.id),
+      ['call-1'],
+    );
+  });
+
+  it('never places phone-only leads on the Email tab', () => {
+    const parts = partitionLeads([
+      { id: 'phone', phone: '512-555-0100', email: null, status: 'ready' },
+    ]);
+    assert.equal(parts.email.length, 0);
+    assert.equal(parts.call.length, 1);
+  });
+});
+
 describe('decision payload', () => {
   it('keeps Accept/Skip body {action, lead_id, business_name, batch_id}', () => {
     const payload = buildDecisionPayload({
@@ -118,6 +178,15 @@ describe('decision payload', () => {
       business_name: "Adolph's Barber Shop",
       batch_id: 'leads-csv-2026-09-18',
     });
+  });
+
+  it('does not POST invented call outcome actions', () => {
+    const payload = buildDecisionPayload({
+      action: 'called',
+      lead: { id: 'phone-only', business_name: 'Phone Shop' },
+      batchId: 'leads-csv-2026-09-18',
+    });
+    assert.equal(payload.action, 'ping');
   });
 });
 
@@ -164,6 +233,16 @@ describe('public batch.json placeholder', () => {
     assert.match(utils, /fetchEnrollmentStatus/);
     assert.match(client, /canRegister/);
     assert.match(client, /handleSessionInvalid/);
+    assert.match(client, /partitionLeads/);
+    assert.match(client, /Email/);
+    assert.match(client, /Call/);
+    assert.match(client, /No email leads in this batch/);
+    assert.match(client, /No call leads in this batch/);
+    assert.match(client, /Call outcomes coming/);
+    assert.doesNotMatch(client, /action:\s*['"]called['"]/);
+    assert.doesNotMatch(client, /['"]called['"]/);
+    assert.doesNotMatch(client, /No answer/);
+    assert.doesNotMatch(client, /Bad number/);
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
   });
 });

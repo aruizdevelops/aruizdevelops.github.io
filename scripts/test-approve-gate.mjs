@@ -21,16 +21,40 @@ const TEST_BATCH = {
   region: 'internal',
   leads: [
     {
-      id: 'internal-test-lead',
-      business_name: 'Internal Test Lead',
+      id: 'internal-email-lead',
+      business_name: 'Internal Email Lead',
       niche: 'test',
       city: 'Austin',
-      phone: '',
+      phone: '512-555-0100',
+      email: 'shop@example.com',
+      why: 'E2E fixture only; not published on GitHub Pages.',
+      website_url: '',
+      maps_url: '',
+      status: 'ready_for_outreach',
+    },
+    {
+      id: 'internal-call-lead',
+      business_name: 'Internal Call Lead',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0199',
       email: '',
       why: 'E2E fixture only; not published on GitHub Pages.',
       website_url: '',
       maps_url: '',
       status: 'ready_for_outreach',
+    },
+    {
+      id: 'internal-skip-phone',
+      business_name: 'Internal Skip Phone',
+      niche: 'test',
+      city: 'Austin',
+      phone: '512-555-0111',
+      email: '',
+      why: 'E2E fixture only; not published on GitHub Pages.',
+      website_url: '',
+      maps_url: '',
+      status: 'skip',
     },
   ],
 };
@@ -313,9 +337,20 @@ async function main() {
       failures.push(`enroll error: ${enrollError}`);
     }
     await page.waitForSelector('.approve-card', { timeout: 15000 });
+    const emailTab = page.getByRole('tab', { name: /Email/ });
+    const callTab = page.getByRole('tab', { name: /Call/ });
+    if (!(await emailTab.isVisible()) || !(await callTab.isVisible())) {
+      failures.push('Email | Call tabs missing after unlock');
+    }
     const name = await page.locator('.approve-name').first().textContent();
-    if (!/Internal Test Lead/.test(name || '')) {
-      failures.push(`unexpected card after enroll: ${name}`);
+    if (!/Internal Email Lead/.test(name || '')) {
+      failures.push(`unexpected Email-tab card after enroll: ${name}`);
+    }
+    if ((await page.getByRole('button', { name: 'Accept' }).count()) === 0) {
+      failures.push('Accept missing on Email tab');
+    }
+    if ((await page.locator('.approve-name').count()) !== 1) {
+      failures.push('Email tab should show only the emailable lead');
     }
     await shot('approve_unlocked_after_enroll.png');
 
@@ -329,11 +364,46 @@ async function main() {
       if (keys !== 'action,batch_id,business_name,lead_id') {
         failures.push(`decision body keys: ${keys}`);
       }
-      if (body.action !== 'approve' || body.lead_id !== 'internal-test-lead') {
+      if (body.action !== 'approve' || body.lead_id !== 'internal-email-lead') {
         failures.push(`bad decision payload ${JSON.stringify(body)}`);
       }
     }
     await shot('approve_accept_recorded.png');
+
+    await callTab.click();
+    await page.waitForSelector('.approve-call-note, .approve-status-msg', {
+      timeout: 5000,
+    });
+    const callNames = await page.locator('.approve-name').allTextContents();
+    if (!callNames.some((text) => /Internal Call Lead/.test(text))) {
+      failures.push(`Call tab missing phone-only lead: ${callNames.join(' | ')}`);
+    }
+    if (callNames.some((text) => /Internal Email Lead/.test(text))) {
+      failures.push('Email lead leaked onto Call tab');
+    }
+    if (callNames.some((text) => /Internal Skip Phone/.test(text))) {
+      failures.push('skip-status phone lead appeared on Call tab');
+    }
+    if ((await page.getByRole('button', { name: 'Accept' }).count()) !== 0) {
+      failures.push('Accept shown on read-only Call tab');
+    }
+    if ((await page.getByRole('button', { name: 'Skip' }).count()) !== 0) {
+      failures.push('Skip shown on read-only Call tab');
+    }
+    if ((await page.getByRole('button', { name: 'Called' }).count()) !== 0) {
+      failures.push('Called button shipped on Call tab');
+    }
+    const callNote = (await page.locator('.approve-call-note').textContent()) || '';
+    if (!/outcomes coming/i.test(callNote)) {
+      failures.push(`missing Call outcomes note: ${callNote}`);
+    }
+    if (decisions.length !== 1) {
+      failures.push(`Call tab posted a decision: ${JSON.stringify(decisions)}`);
+    }
+    await shot('approve_call_tab_readonly.png');
+
+    await emailTab.click();
+    await page.waitForSelector('.approve-done-bar', { timeout: 5000 });
 
     await page.getByRole('button', { name: 'Lock' }).click();
     await page.waitForSelector('.approve-lock-title', { timeout: 5000 });
