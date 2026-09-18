@@ -45,6 +45,9 @@ jobs:
 
       - name: Build
         working-directory: bluebonnet-tech-portfolio
+        env:
+          # Optional public Formspree / Apps Script / webhook URL. See UNSUBSCRIBE.md.
+          NEXT_PUBLIC_UNSUBSCRIBE_ENDPOINT: ${{ vars.UNSUBSCRIBE_ENDPOINT }}
         run: npm run build
 
       - name: Setup Pages
