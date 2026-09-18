@@ -309,12 +309,16 @@ export async function postApprovalJson(path, body, token) {
       body: JSON.stringify(body ?? {}),
     });
     const data = await parseJsonSafe(response);
+    const proxyError =
+      data && typeof data.error === 'string' ? data.error.trim() : '';
     return {
       ok: response.ok,
       status: response.status,
       data,
       unauthorized: response.status === 401 || response.status === 403,
-      reason: response.ok ? undefined : `http-${response.status}`,
+      reason: response.ok
+        ? undefined
+        : proxyError || `http-${response.status}`,
     };
   } catch {
     return { ok: false, reason: 'network' };
@@ -497,6 +501,7 @@ export async function unlockDevice() {
 
 export function proxyAuthErrorMessage(result) {
   if (!result) return 'Could not reach the approval proxy. Try again.';
+  const detail = String(result.reason || result.data?.error || '');
   if (result.reason === 'proxy-not-configured') {
     return 'Approval proxy is not configured.';
   }
@@ -506,10 +511,19 @@ export function proxyAuthErrorMessage(result) {
   if (result.reason === 'webauthn-options-missing-challenge') {
     return 'The passkey service did not return a challenge. Try again in a moment.';
   }
+  if (/no credentials registered/i.test(detail)) {
+    return 'No passkey is registered yet. Tap Register this device, then Face ID / Touch ID.';
+  }
+  if (/missing or expired challenge/i.test(detail)) {
+    return 'Passkey challenge expired. Tap Unlock (or Register) and try again.';
+  }
+  if (/attestation failed/i.test(detail) || /assertion failed/i.test(detail)) {
+    return 'Could not verify this device. Try Register this device again.';
+  }
   if (result.status === 404) {
     return 'Passkey service is not ready on the proxy yet. Try again in a moment.';
   }
-  if (result.unauthorized) {
+  if (result.unauthorized || /unauthorized/i.test(detail)) {
     return 'This device is not authorized. Register this device, then unlock.';
   }
   if (result.reason === 'network') {

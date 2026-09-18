@@ -5,19 +5,37 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  APPROVAL_PROXY_URL,
   assertPrivateBatchUrl,
   buildDecisionPayload,
   extractSessionToken,
   getApprovalBatchEndpoint,
   getApprovalProxyEndpoint,
   getApprovalProxyPath,
+  getApprovalProxyUrl,
   normalizeBatch,
+  proxyAuthErrorMessage,
   sessionHeaders,
 } from './approve.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 describe('approval proxy paths', () => {
+  it('is wired to the live CoS Cloudflare proxy', () => {
+    assert.equal(
+      getApprovalProxyUrl(),
+      'https://authorized-philip-mechanics-rick.trycloudflare.com',
+    );
+    assert.equal(
+      APPROVAL_PROXY_URL,
+      'https://authorized-philip-mechanics-rick.trycloudflare.com',
+    );
+    assert.equal(
+      getApprovalBatchEndpoint(),
+      'https://authorized-philip-mechanics-rick.trycloudflare.com/batch',
+    );
+  });
+
   it('points batch and decision at the proxy, never public batch.json', () => {
     const batch = getApprovalBatchEndpoint();
     const decision = getApprovalProxyEndpoint();
@@ -136,5 +154,27 @@ describe('public batch.json placeholder', () => {
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
     assert.doesNotMatch(utils, /export const APPROVE_BATCH_URL/);
     assert.match(utils, /fetchAuthenticatedBatch/);
+  });
+});
+
+describe('live proxy error copy', () => {
+  it('maps first-time enroll and unauthorized errors', () => {
+    assert.match(
+      proxyAuthErrorMessage({
+        ok: false,
+        status: 400,
+        reason: 'no credentials registered',
+      }),
+      /Register this device/,
+    );
+    assert.match(
+      proxyAuthErrorMessage({
+        ok: false,
+        status: 401,
+        unauthorized: true,
+        reason: 'unauthorized',
+      }),
+      /not authorized/i,
+    );
   });
 });

@@ -92,6 +92,38 @@ export function unwrapPublicKeyOptions(payload) {
   return null;
 }
 
+const CREATION_FIELDS = [
+  'rp',
+  'user',
+  'challenge',
+  'pubKeyCredParams',
+  'timeout',
+  'excludeCredentials',
+  'authenticatorSelection',
+  'attestation',
+  'extensions',
+  'hints',
+  'attestationFormats',
+];
+
+const REQUEST_FIELDS = [
+  'challenge',
+  'timeout',
+  'rpId',
+  'allowCredentials',
+  'userVerification',
+  'extensions',
+  'hints',
+];
+
+function pickFields(source, fields) {
+  const out = {};
+  for (const field of fields) {
+    if (source[field] !== undefined) out[field] = source[field];
+  }
+  return out;
+}
+
 function convertDescriptor(descriptor) {
   if (!descriptor || typeof descriptor !== 'object') return descriptor;
   return {
@@ -106,10 +138,8 @@ export function toCreationOptions(optionsJSON) {
     throw new Error('webauthn-options-missing-challenge');
   }
 
-  const publicKey = {
-    ...options,
-    challenge: base64urlToBuffer(options.challenge),
-  };
+  const publicKey = pickFields(options, CREATION_FIELDS);
+  publicKey.challenge = base64urlToBuffer(options.challenge);
 
   if (options.user) {
     publicKey.user = {
@@ -118,10 +148,12 @@ export function toCreationOptions(optionsJSON) {
     };
   }
 
-  if (Array.isArray(options.excludeCredentials)) {
+  if (Array.isArray(options.excludeCredentials) && options.excludeCredentials.length) {
     publicKey.excludeCredentials = options.excludeCredentials.map(
       convertDescriptor,
     );
+  } else {
+    delete publicKey.excludeCredentials;
   }
 
   return { publicKey };
@@ -133,10 +165,8 @@ export function toRequestOptions(optionsJSON) {
     throw new Error('webauthn-options-missing-challenge');
   }
 
-  const publicKey = {
-    ...options,
-    challenge: base64urlToBuffer(options.challenge),
-  };
+  const publicKey = pickFields(options, REQUEST_FIELDS);
+  publicKey.challenge = base64urlToBuffer(options.challenge);
 
   if (Array.isArray(options.allowCredentials) && options.allowCredentials.length) {
     publicKey.allowCredentials = options.allowCredentials.map(convertDescriptor);

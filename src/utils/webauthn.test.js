@@ -89,6 +89,40 @@ describe('toCreationOptions / toRequestOptions', () => {
     });
     assert.equal('allowCredentials' in publicKey, false);
   });
+
+  it('converts the live proxy register/options shape and drops challenge_id', () => {
+    const live = {
+      rp: { name: 'Texas Craft Sites Approval', id: 'aruizdevelops.github.io' },
+      user: {
+        id: 'rxNWYz95yrEK8iJA_aoXOykIJQq6i6uInIjvb9lAv5s',
+        name: 'allen',
+        displayName: 'Allen Ruiz',
+      },
+      challenge:
+        'Hr99XHUo2P_2X63mD-fIOzJs_ulfZT6HQbTawrm9qs5hrvVdQpTk2smMEwe-cnuLjaHIcMQHONk_Ef5Tj1bPzQ',
+      pubKeyCredParams: [
+        { type: 'public-key', alg: -8 },
+        { type: 'public-key', alg: -7 },
+        { type: 'public-key', alg: -257 },
+      ],
+      timeout: 60000,
+      excludeCredentials: [],
+      authenticatorSelection: {
+        residentKey: 'preferred',
+        requireResidentKey: false,
+        userVerification: 'preferred',
+      },
+      attestation: 'none',
+      challenge_id: 'RQV0YYdkWa69N5Gs',
+    };
+    const { publicKey } = toCreationOptions(live);
+    assert.equal(publicKey.rp.id, 'aruizdevelops.github.io');
+    assert.equal(publicKey.challenge instanceof ArrayBuffer, true);
+    assert.equal(publicKey.user.id instanceof ArrayBuffer, true);
+    assert.equal('challenge_id' in publicKey, false);
+    assert.equal('excludeCredentials' in publicKey, false);
+    assert.equal(publicKey.authenticatorSelection.userVerification, 'preferred');
+  });
 });
 
 describe('credentialToJSON', () => {
