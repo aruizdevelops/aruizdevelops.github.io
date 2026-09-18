@@ -1,0 +1,44 @@
+{
+  "batch_id": "2026-09-19",
+  "generated_at": "2026-09-19T12:00:00.000Z",
+  "webhook_url": "",
+  "region": "Austin TX ~30mi",
+  "leads": [
+    {
+      "id": "lead-001",
+      "business_name": "Hill Country Barber Co.",
+      "niche": "barbershop",
+      "city": "Austin",
+      "phone": "(512) 555-0142",
+      "email": "",
+      "why": "When someone googles you on their phone, there's no real website — the whole funnel is a booking page. Booking works, but South Austin clients don't get a branded mobile shop page first. A clean mobile site would fix that.",
+      "website_url": "https://example.com",
+      "maps_url": "https://www.google.com/maps/search/?api=1&query=Hill+Country+Barber+Co.%2C+Austin%2C+TX",
+      "status": "ready_for_outreach"
+    },
+    {
+      "id": "lead-002",
+      "business_name": "Magnolia Beauty Studio",
+      "niche": "beauty salon",
+      "city": "Round Rock",
+      "phone": "(512) 555-0198",
+      "email": "hello@example.com",
+      "why": "Your online presence is mostly Facebook and directories — when someone googles you on their phone, there's no real website to open. People can't quickly see services, hours, or tap to book. A clean mobile site would give Round Rock clients one trusted place to read, call, and book.",
+      "website_url": "https://example.com",
+      "maps_url": "https://www.google.com/maps/search/?api=1&query=Magnolia+Beauty+Studio%2C+Round+Rock%2C+TX",
+      "status": "ready_for_outreach"
+    },
+    {
+      "id": "lead-003",
+      "business_name": "Barton Springs Day Spa",
+      "niche": "spa",
+      "city": "Austin",
+      "phone": "(512) 555-0160",
+      "email": "",
+      "why": "The claimed website often won't load on a phone, so people tapping Website from Google hit a dead end instead of a branded spa page. A clean mobile site that actually opens would sit in front of booking and build trust.",
+      "website_url": "https://example.com",
+      "maps_url": "https://www.google.com/maps/search/?api=1&query=Barton+Springs+Day+Spa%2C+Austin%2C+TX",
+      "status": "researching"
+    }
+  ]
+}
