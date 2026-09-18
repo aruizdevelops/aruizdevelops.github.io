@@ -1,6 +1,6 @@
 # Lead approvals
 
-Allen reviews Scout batches on his phone at a public static page on this GitHub Pages site.
+Allen reviews Scout batches on his phone at a public static page on this GitHub Pages site. The page URL is public; **lead cards and Accept/Skip are not.** A WebAuthn / passkey gate unlocks the UI on Allen’s registered device only.
 
 ## Public URL
 
@@ -10,21 +10,44 @@ https://aruizdevelops.github.io/approve/
 
 Email Allen that link when a batch is ready. The page is an internal review UI (`noindex`). It is not linked from the public portfolio nav.
 
-## Security: never put the sender key on GitHub Pages
+## Allen: first-time enroll
+
+1. Open **https://aruizdevelops.github.io/approve/** on the phone that should be allowed.
+2. Tap **Register this device**.
+3. Complete Face ID / Touch ID (platform authenticator).
+4. If the page still shows the lock screen, tap **Unlock with Face ID / Touch ID**.
+5. Lead cards load from the proxy. Accept / Skip as usual.
+
+Later visits: tap **Unlock with Face ID / Touch ID**. Do not publish leads on GitHub Pages.
+
+## Security: static GitHub Pages cannot hide secrets or lead lists
 
 This site is a **static export**. Anything in the client bundle, `public/`, or committed files is public.
 
-**Do not** put any of these in this repo, env vars that Next inlines, `batch.json`, or browser JS:
+**Do not** put any of these in this repo, env vars that Next inlines, `public/approve/batch.json`, or browser JS:
 
 - Cursor automation **sender key**
-- `Authorization` headers
 - The upstream Cursor webhook URL (the proxy calls that server-side)
+- The real lead list
 
-The browser only POSTs JSON to a **public proxy** that CoS operates. The proxy attaches the secret and forwards to Cursor.
+`public/approve/batch.json` is an empty placeholder so the previously published list is overwritten. The client **does not fetch it**. After a successful WebAuthn login, it loads:
+
+```
+GET ${APPROVAL_PROXY_URL}/batch
+Authorization: Bearer <session_token>
+X-Session-Token: <session_token>
+```
+
+Never ship a half-open gate that renders lead cards from the static file.
+
+Relying party for passkeys:
+
+- RP ID: `aruizdevelops.github.io`
+- Origin: `https://aruizdevelops.github.io`
 
 ## How Scout publishes a batch
 
-Scout **regenerates** `public/approve/batch.json` per batch and ships it with the GitHub Pages deploy.
+Scout publishes the batch **to the approval proxy** (not to this repo). The proxy serves it on authenticated `GET /batch`.
 
 Shape:
 
@@ -78,7 +101,7 @@ The page always adds a **Google** verify pill from name + city.
 
 ## How a decision is recorded
 
-On **Accept** or **Skip**:
+On **Accept** or **Skip** (only after unlock):
 
 1. The page POSTs JSON to:
 
@@ -92,51 +115,63 @@ On **Accept** or **Skip**:
    https://authorized-philip-mechanics-rick.trycloudflare.com/decision
    ```
 
-   Headers: `Content-Type: application/json` only. **No Authorization header.**
+   Headers: `Content-Type: application/json`, plus the WebAuthn session:
 
-2. On a successful proxy POST, the card is marked done in `localStorage` (`tcs-lead-approvals`, keyed by `batch_id` + lead `id`). That is device-only.
+   ```
+   Authorization: Bearer <session_token>
+   X-Session-Token: <session_token>
+   ```
 
-3. If `APPROVAL_PROXY_URL` were ever empty, the page would show **Proxy not configured** and Accept/Skip would open a mailto to `allen.s.ruiz1@gmail.com` whose subject encodes `approve:` / `skip:` + lead id + name. Production builds use the committed Cloudflare URL, so this fallback should not appear.
+   That session token is issued by `POST /webauthn/login/verify`. It is **not** a Cursor sender key.
 
-4. If the proxy URL is set but the POST fails, the card stays open so Allen can retry. It does **not** fall back to mailto (that would hide a broken proxy).
+2. Body (unchanged):
 
-POST body:
+   ```json
+   {
+     "action": "approve",
+     "lead_id": "lead-001",
+     "business_name": "Example Barbershop",
+     "batch_id": "2026-09-19"
+   }
+   ```
 
-```json
-{
-  "action": "approve",
-  "lead_id": "lead-001",
-  "business_name": "Example Barbershop",
-  "batch_id": "2026-09-19"
-}
-```
+   `action` is `approve` or `skip`.
 
-`action` is `approve` or `skip`. `business_name` and `batch_id` are included when present.
+3. On a successful proxy POST, the card is marked done in `localStorage` (`tcs-lead-approvals`, keyed by `batch_id` + lead `id`). That is device-only.
 
-Mailto subject (only if the proxy URL is empty):
+4. If `APPROVAL_PROXY_URL` were ever empty, the lock screen stays closed (leads cannot load) and the page would show that the proxy is not configured. Production builds use the committed Cloudflare URL.
+
+5. If the session expired (401/403), the page re-locks. If the proxy POST fails for another reason, the card stays open so Allen can retry.
+
+Mailto subject (only if the proxy URL is empty — should not appear in production):
 
 ```
 approve: lead-001 Example Barbershop
 skip: lead-001 Example Barbershop
 ```
 
-The public config is `src/config/approval.js`:
-
-```js
-export const APPROVAL_PROXY_URL =
-  process.env.NEXT_PUBLIC_APPROVAL_PROXY_URL ||
-  'https://authorized-philip-mechanics-rick.trycloudflare.com';
-```
+The public config is `src/config/approval.js`.
 
 ## CoS: wire the proxy
 
 The live proxy is the Cloudflare tunnel above. It must:
 
 - Allow CORS from `https://aruizdevelops.github.io`
-- Accept `POST /decision` with the JSON body above (no browser auth)
-- Forward that body to the **upstream** Cursor automation webhook, adding the sender key **only on the server** (never in this repo):
+- Allow methods `GET, POST, OPTIONS`
+- Allow headers `Content-Type, Authorization, X-Session-Token`
+- Implement:
 
-  `https://api2.cursor.sh/automations/webhook/ed64d389-5927-5f88-ac53-ed47e40daeaf`
+  | Endpoint | Auth | Role |
+  | --- | --- | --- |
+  | `POST /webauthn/register/options` | no | Create passkey options (platform authenticator, UV required). RP ID `aruizdevelops.github.io`. |
+  | `POST /webauthn/register/verify` | no | Verify attestation. First-time enroll of Allen’s device. |
+  | `POST /webauthn/login/options` | no | Create assertion options. |
+  | `POST /webauthn/login/verify` | no | Verify assertion. Return `{ "session_token": "..." }`. |
+  | `GET /batch` | session | Return the current batch JSON. |
+  | `POST /decision` | session | Accept/Skip body above; forward to Cursor **server-side** with the sender key. |
+
+- Reject `GET /batch` and `POST /decision` without a valid session.
+- Restrict passkey registration to Allen’s allowlist (do not let the public enroll a second account).
 
 Override the base URL with GitHub Actions variable `APPROVAL_PROXY_URL` if the tunnel host changes. Deploy inlines it as `NEXT_PUBLIC_APPROVAL_PROXY_URL`.
 

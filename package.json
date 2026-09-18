@@ -6,6 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
+    "test": "node --experimental-default-type=module --test src/utils/*.test.js",
     "capture-screenshots": "node scripts/capture-screenshots.js"
   },
   "dependencies": {

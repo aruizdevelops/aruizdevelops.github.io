@@ -3,20 +3,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-  APPROVE_BATCH_URL,
   buildDecisionMailto,
   buildVerifyLinks,
   countBy,
+  clearSessionToken,
+  enrollDevice,
+  fetchAuthenticatedBatch,
   formatBatchDate,
   formatCountLine,
   formatStatusLabel,
   getLeadDecision,
-  readDecisionStore,
-  statusTone,
   isApprovalProxyConfigured,
+  isWebAuthnSupported,
+  openMailto,
+  proxyAuthErrorMessage,
+  readDeviceEnrolled,
+  readDecisionStore,
+  readSessionToken,
+  statusTone,
   storeLeadDecision,
   submitLeadDecision,
-  openMailto,
+  unlockDevice,
+  webAuthnErrorMessage,
 } from '../../src/utils/approve';
 import './approve.css';
 
@@ -145,14 +153,153 @@ function LeadCard({
   );
 }
 
+function LockPanel({
+  enrolled,
+  supported,
+  proxyConfigured,
+  busy,
+  error,
+  onUnlock,
+  onRegister,
+}) {
+  const primaryIsRegister = !enrolled;
+  return (
+    <div className="approve-lock">
+      <div className="approve-lock-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none">
+          <path
+            d="M12 2.5c-2.4 2.6-3.6 5-3.6 7.2 0 2.1.8 3.9 3.6 6.8 2.8-2.9 3.6-4.7 3.6-6.8 0-2.2-1.2-4.6-3.6-7.2Z"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8.2 11.2c-.7 1.1-1.1 2.2-1.1 3.3 0 2.8 2.2 5.4 4.9 6.5 2.7-1.1 4.9-3.7 4.9-6.5 0-1.1-.4-2.2-1.1-3.3"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+          <circle cx="12" cy="11.2" r="1.15" fill="currentColor" />
+        </svg>
+      </div>
+      <h2 className="approve-lock-title">Unlock with Face ID / Touch ID</h2>
+      <p className="approve-lock-copy">
+        {enrolled
+          ? "This batch stays locked until Allen's registered device confirms with a passkey."
+          : 'First visit on this phone: register this device, then use Face ID or Touch ID to unlock.'}
+      </p>
+
+      {!supported ? (
+        <p className="approve-error" role="alert">
+          This browser does not support Face ID / Touch ID passkeys. Open
+          /approve/ in Safari or Chrome on Allen's phone.
+        </p>
+      ) : null}
+
+      {!proxyConfigured ? (
+        <p className="approve-error" role="alert">
+          Approval proxy is not configured, so this page cannot unlock or load
+          leads.
+        </p>
+      ) : null}
+
+      <div className="approve-lock-actions">
+        {primaryIsRegister ? (
+          <>
+            <button
+              type="button"
+              className="approve-btn approve-btn-accept"
+              disabled={busy || !supported || !proxyConfigured}
+              onClick={onRegister}
+            >
+              {busy ? 'Waiting for Face ID…' : 'Register this device'}
+            </button>
+            <button
+              type="button"
+              className="approve-btn approve-btn-unlock"
+              disabled={busy || !supported || !proxyConfigured}
+              onClick={onUnlock}
+            >
+              Unlock with Face ID / Touch ID
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="approve-btn approve-btn-accept"
+              disabled={busy || !supported || !proxyConfigured}
+              onClick={onUnlock}
+            >
+              {busy ? 'Waiting for Face ID…' : 'Unlock with Face ID / Touch ID'}
+            </button>
+            <button
+              type="button"
+              className="approve-btn approve-btn-unlock"
+              disabled={busy || !supported || !proxyConfigured}
+              onClick={onRegister}
+            >
+              Register this device
+            </button>
+          </>
+        )}
+      </div>
+      {error ? (
+        <p className="approve-error" role="alert">
+          {error}
+        </p>
+      ) : (
+        <p className="approve-lock-hint">
+          Only Allen's enrolled device can see lead cards or tap Accept / Skip.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ApproveClient() {
+  const [gate, setGate] = useState('checking');
   const [batch, setBatch] = useState(null);
-  const [loadState, setLoadState] = useState('loading');
+  const [loadState, setLoadState] = useState('idle');
   const [store, setStore] = useState({});
   const [busyId, setBusyId] = useState('');
   const [mailtoByLead, setMailtoByLead] = useState({});
   const [errorsByLead, setErrorsByLead] = useState({});
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [enrolled, setEnrolled] = useState(false);
+  const [supported, setSupported] = useState(true);
   const proxyConfigured = isApprovalProxyConfigured();
+
+  const lockScreen = () => {
+    clearSessionToken();
+    setBatch(null);
+    setLoadState('idle');
+    setGate('locked');
+  };
+
+  const loadBatchWithToken = useCallback(async (token) => {
+    setLoadState('loading');
+    const result = await fetchAuthenticatedBatch(token);
+    if (result.unauthorized) {
+      lockScreen();
+      setAuthError(
+        'Session expired. Unlock with Face ID / Touch ID to continue.',
+      );
+      return false;
+    }
+    if (!result.ok) {
+      setBatch(null);
+      setLoadState('error');
+      setGate('open');
+      return false;
+    }
+    setBatch(result.batch);
+    setStore(readDecisionStore());
+    setLoadState('ready');
+    setGate('open');
+    return true;
+  }, []);
 
   useEffect(() => {
     const previousBackground = document.body.style.backgroundColor;
@@ -166,23 +313,30 @@ export default function ApproveClient() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    setSupported(isWebAuthnSupported());
+    setEnrolled(readDeviceEnrolled());
 
-    async function load() {
-      try {
-        const response = await fetch(APPROVE_BATCH_URL, { cache: 'no-store' });
-        if (!response.ok) throw new Error('batch-load-failed');
-        const data = await response.json();
-        if (cancelled) return;
-        setBatch(data);
-        setStore(readDecisionStore());
-        setLoadState('ready');
-      } catch {
-        if (!cancelled) setLoadState('error');
-      }
+    const token = readSessionToken();
+    if (!token) {
+      setGate('locked');
+      return;
     }
 
-    load();
+    let cancelled = false;
+    (async () => {
+      const result = await fetchAuthenticatedBatch(token);
+      if (cancelled) return;
+      if (result.unauthorized || !result.ok) {
+        clearSessionToken();
+        setGate('locked');
+        return;
+      }
+      setBatch(result.batch);
+      setStore(readDecisionStore());
+      setLoadState('ready');
+      setGate('open');
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -208,6 +362,33 @@ export default function ApproveClient() {
     return { ready, researching, niches, accepted, skipped, remaining };
   }, [leads, store, batchId]);
 
+  const runAuth = useCallback(
+    async (mode) => {
+      if (authBusy) return;
+      setAuthBusy(true);
+      setAuthError('');
+      try {
+        const result = mode === 'register' ? await enrollDevice() : await unlockDevice();
+        if (!result.ok) {
+          setAuthError(proxyAuthErrorMessage(result));
+          return;
+        }
+        if (mode === 'register') setEnrolled(true);
+        const token = result.token || readSessionToken();
+        if (!token) {
+          setAuthError(proxyAuthErrorMessage({ reason: 'missing-session-token' }));
+          return;
+        }
+        await loadBatchWithToken(token);
+      } catch (error) {
+        setAuthError(webAuthnErrorMessage(error));
+      } finally {
+        setAuthBusy(false);
+      }
+    },
+    [authBusy, loadBatchWithToken],
+  );
+
   const handleDecide = useCallback(
     async (lead, action) => {
       if (!batch || busyId) return;
@@ -221,7 +402,19 @@ export default function ApproveClient() {
       });
 
       try {
-        const result = await submitLeadDecision({ action, lead, batch });
+        const result = await submitLeadDecision({
+          action,
+          lead,
+          batch,
+          token: readSessionToken(),
+        });
+        if (result.unauthorized) {
+          lockScreen();
+          setAuthError(
+            'Session expired. Unlock with Face ID / Touch ID to continue.',
+          );
+          return;
+        }
         setStore(result.store || readDecisionStore());
 
         if (result.submittedToProxy) return;
@@ -269,11 +462,14 @@ export default function ApproveClient() {
   );
 
   const dateLabel = formatBatchDate(batch?.generated_at, batch?.batch_id);
-  const subtitleParts = [
-    dateLabel,
-    batch?.region,
-    'tap Accept or Skip as you check',
-  ].filter(Boolean);
+  const locked = gate !== 'open';
+  const subtitleParts = locked
+    ? ['Unlock with Face ID / Touch ID']
+    : [
+        dateLabel,
+        batch?.region,
+        'tap Accept or Skip as you check',
+      ].filter(Boolean);
 
   return (
     <div className="approve-root">
@@ -284,35 +480,63 @@ export default function ApproveClient() {
             <h1 className="approve-title">Daily Approvals</h1>
             <p className="approve-subtitle">{subtitleParts.join(' · ')}</p>
             <div className="approve-summary" aria-live="polite">
-              {loadState === 'ready' ? (
+              {locked ? (
+                <>
+                  {gate === 'checking'
+                    ? 'Checking this device…'
+                    : "Locked. Only Allen's registered device can open this batch."}
+                </>
+              ) : loadState === 'ready' ? (
                 <SummaryText stats={stats} total={leads.length} />
               ) : loadState === 'error' ? (
-                <>Could not load this batch. Refresh, or ask Scout to send a new pack.</>
+                <>
+                  Could not load this batch from the approval proxy. Unlock
+                  again, or ask Scout to publish the list.
+                </>
               ) : (
                 <>Loading this batch…</>
               )}
             </div>
-            {!proxyConfigured ? (
-              <div className="approve-notice" role="status">
-                Proxy not configured. Accept/Skip will email Allen with the
-                action and lead id until the live proxy URL is set.
-              </div>
+            {!locked ? (
+              <button
+                type="button"
+                className="approve-lock-again"
+                onClick={() => {
+                  lockScreen();
+                  setAuthError('');
+                }}
+              >
+                Lock
+              </button>
             ) : null}
           </header>
 
           <div className="approve-body">
-            {loadState === 'error' ? (
+            {gate === 'checking' ? (
+              <div className="approve-status-msg">Checking this device…</div>
+            ) : locked ? (
+              <LockPanel
+                enrolled={enrolled}
+                supported={supported}
+                proxyConfigured={proxyConfigured}
+                busy={authBusy}
+                error={authError}
+                onUnlock={() => runAuth('unlock')}
+                onRegister={() => runAuth('register')}
+              />
+            ) : loadState === 'error' ? (
               <div className="approve-status-msg">
                 <strong>Batch unavailable</strong>
-                Refresh this page, or wait for Scout to publish the next pack.
+                Unlock again, or wait for Scout to publish the next pack to the
+                approval proxy.
               </div>
             ) : loadState === 'loading' ? (
               <div className="approve-status-msg">Loading leads…</div>
             ) : leads.length === 0 ? (
               <div className="approve-status-msg">
                 <strong>No leads in this batch</strong>
-                Scout can republish <code>batch.json</code> when the next list
-                is ready.
+                Scout can publish the next list to the approval proxy when it is
+                ready.
               </div>
             ) : (
               leads.map((lead, index) => (

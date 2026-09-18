@@ -22,6 +22,7 @@
   background: #0f172a;
   border-radius: 14px 14px 0 0;
   padding: 22px 18px;
+  position: relative;
 }
 
 .approve-eyebrow {
@@ -295,4 +296,81 @@
   margin-bottom: 6px;
   color: #0f172a;
   font-size: 16px;
+}
+
+.approve-lock {
+  margin: 8px 0 14px;
+  padding: 28px 18px 22px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.approve-lock-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #5eead4;
+}
+
+.approve-lock-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.approve-lock-copy {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.approve-lock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.approve-btn-unlock {
+  border: 1.5px solid #0f172a;
+  background: #fff;
+  color: #0f172a;
+}
+
+.approve-lock-hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.approve-lock-again {
+  appearance: none;
+  display: inline-block;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.approve-lock-again:hover,
+.approve-lock-again:focus-visible {
+  color: #5eead4;
 }
