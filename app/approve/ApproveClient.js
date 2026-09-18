@@ -13,6 +13,7 @@ import {
   getLeadDecision,
   readDecisionStore,
   statusTone,
+  isApprovalProxyConfigured,
   storeLeadDecision,
   submitLeadDecision,
   openMailto,
@@ -30,6 +31,7 @@ function LeadCard({
   decision,
   busy,
   mailtoHref,
+  error,
   onDecide,
 }) {
   const statusLabel = formatStatusLabel(
@@ -111,31 +113,33 @@ function LeadCard({
           </div>
           {mailtoHref ? (
             <p className="approve-mailto">
-              If a mail window opened, send that message so the decision is
-              recorded.{' '}
+              Proxy is not configured, so this tap emailed Allen instead.{' '}
               <a href={mailtoHref}>Open email again</a>
             </p>
           ) : null}
         </>
       ) : (
-        <div className="approve-actions">
-          <button
-            type="button"
-            className="approve-btn approve-btn-accept"
-            disabled={busy}
-            onClick={() => onDecide(lead, 'approve')}
-          >
-            {busy ? 'Saving…' : 'Accept'}
-          </button>
-          <button
-            type="button"
-            className="approve-btn approve-btn-skip"
-            disabled={busy}
-            onClick={() => onDecide(lead, 'skip')}
-          >
-            Skip
-          </button>
-        </div>
+        <>
+          <div className="approve-actions">
+            <button
+              type="button"
+              className="approve-btn approve-btn-accept"
+              disabled={busy}
+              onClick={() => onDecide(lead, 'approve')}
+            >
+              {busy ? 'Saving…' : 'Accept'}
+            </button>
+            <button
+              type="button"
+              className="approve-btn approve-btn-skip"
+              disabled={busy}
+              onClick={() => onDecide(lead, 'skip')}
+            >
+              Skip
+            </button>
+          </div>
+          {error ? <p className="approve-error">{error}</p> : null}
+        </>
       )}
     </article>
   );
@@ -147,6 +151,8 @@ export default function ApproveClient() {
   const [store, setStore] = useState({});
   const [busyId, setBusyId] = useState('');
   const [mailtoByLead, setMailtoByLead] = useState({});
+  const [errorsByLead, setErrorsByLead] = useState({});
+  const proxyConfigured = isApprovalProxyConfigured();
 
   useEffect(() => {
     const previousBackground = document.body.style.backgroundColor;
@@ -208,14 +214,39 @@ export default function ApproveClient() {
       if (getLeadDecision(store, batch.batch_id, lead.id)) return;
 
       setBusyId(lead.id);
+      setErrorsByLead((prev) => {
+        const next = { ...prev };
+        delete next[lead.id];
+        return next;
+      });
+
       try {
         const result = await submitLeadDecision({ action, lead, batch });
         setStore(result.store || readDecisionStore());
+
+        if (result.submittedToProxy) return;
+
         if (result.usedMailto && result.mailtoHref) {
           setMailtoByLead((prev) => ({ ...prev, [lead.id]: result.mailtoHref }));
           window.requestAnimationFrame(() => openMailto(result.mailtoHref));
+          return;
         }
+
+        setErrorsByLead((prev) => ({
+          ...prev,
+          [lead.id]:
+            'Could not reach the approval proxy. Try Accept or Skip again.',
+        }));
       } catch {
+        if (isApprovalProxyConfigured()) {
+          setErrorsByLead((prev) => ({
+            ...prev,
+            [lead.id]:
+              'Could not reach the approval proxy. Try Accept or Skip again.',
+          }));
+          return;
+        }
+
         const mailtoHref = buildDecisionMailto({
           action,
           lead,
@@ -261,6 +292,12 @@ export default function ApproveClient() {
                 <>Loading this batch…</>
               )}
             </div>
+            {!proxyConfigured ? (
+              <div className="approve-notice" role="status">
+                Proxy not configured. Accept/Skip will email Allen with the
+                action and lead id until the live proxy URL is set.
+              </div>
+            ) : null}
           </header>
 
           <div className="approve-body">
@@ -286,6 +323,7 @@ export default function ApproveClient() {
                   decision={getLeadDecision(store, batchId, lead.id)}
                   busy={busyId === lead.id}
                   mailtoHref={mailtoByLead[lead.id]}
+                  error={errorsByLead[lead.id]}
                   onDecide={handleDecide}
                 />
               ))

@@ -34,6 +34,6 @@ Allen reviews Scout batches on his phone at:
 https://aruizdevelops.github.io/approve/
 ```
 
-Scout regenerates `public/approve/batch.json` per batch. CoS can set `webhook_url` on that file (or `NEXT_PUBLIC_APPROVAL_WEBHOOK_URL` at build time). Until a webhook is wired, Accept / Skip uses a mailto fallback to `allen.s.ruiz1@gmail.com`.
+Scout regenerates `public/approve/batch.json` per batch. Accept/Skip POST JSON to `https://authorized-philip-mechanics-rick.trycloudflare.com/decision` (override with `NEXT_PUBLIC_APPROVAL_PROXY_URL`) with **no Authorization header**. The Cursor sender key never ships in this repo.
 
 See [APPROVE.md](./APPROVE.md) for the JSON shape, POST body, and how decisions are recorded.

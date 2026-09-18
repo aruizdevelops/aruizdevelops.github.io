@@ -10,9 +10,21 @@ https://aruizdevelops.github.io/approve/
 
 Email Allen that link when a batch is ready. The page is an internal review UI (`noindex`). It is not linked from the public portfolio nav.
 
+## Security: never put the sender key on GitHub Pages
+
+This site is a **static export**. Anything in the client bundle, `public/`, or committed files is public.
+
+**Do not** put any of these in this repo, env vars that Next inlines, `batch.json`, or browser JS:
+
+- Cursor automation **sender key**
+- `Authorization` headers
+- The upstream Cursor webhook URL (the proxy calls that server-side)
+
+The browser only POSTs JSON to a **public proxy** that CoS operates. The proxy attaches the secret and forwards to Cursor.
+
 ## How Scout publishes a batch
 
-This site is a static export (`output: 'export'`), so there is no server of our own. Scout **regenerates** `public/approve/batch.json` per batch and ships it with the GitHub Pages deploy (commit + push, or overwrite the file on `main` and let deploy run).
+Scout **regenerates** `public/approve/batch.json` per batch and ships it with the GitHub Pages deploy.
 
 Shape:
 
@@ -20,7 +32,6 @@ Shape:
 {
   "batch_id": "2026-09-19",
   "generated_at": "2026-09-19T12:00:00.000Z",
-  "webhook_url": "",
   "region": "Austin TX ~30mi",
   "leads": [
     {
@@ -43,9 +54,10 @@ Shape:
 | --- | --- | --- |
 | `batch_id` | yes | Groups decisions in `localStorage`. New batch id = fresh review. |
 | `generated_at` | yes | ISO timestamp. Shown in the header as a date. |
-| `webhook_url` | no | Public POST URL for this batch. Empty string uses the build-time fallback, then mailto. |
 | `region` | no | Header subtitle bit, e.g. `Austin TX ~30mi`. |
 | `leads` | yes | Cards, in order. |
+
+If a `webhook_url` field is present, the **page ignores it**. Do not put secrets or the Cursor webhook there.
 
 Each lead:
 
@@ -66,14 +78,29 @@ The page always adds a **Google** verify pill from name + city.
 
 ## How a decision is recorded
 
-On **Accept** or **Skip** the page:
+On **Accept** or **Skip**:
 
-1. **Marks the card done** in `localStorage` under `tcs-lead-approvals` (keyed by `batch_id` + lead `id`). That is device-only.
-2. **POSTs JSON** to `batch.webhook_url` when that string is a public `http(s)` URL.
-3. Else POSTs to `NEXT_PUBLIC_APPROVAL_WEBHOOK_URL` when that env var was baked in at **build** time.
-4. **Falls back** to a prefilled mailto to `allen.s.ruiz1@gmail.com` when no webhook is set or the POST fails.
+1. The page POSTs JSON to:
 
-POST body (no secrets):
+   ```
+   ${APPROVAL_PROXY_URL}/decision
+   ```
+
+   Production default (committed in `src/config/approval.js`):
+
+   ```
+   https://authorized-philip-mechanics-rick.trycloudflare.com/decision
+   ```
+
+   Headers: `Content-Type: application/json` only. **No Authorization header.**
+
+2. On a successful proxy POST, the card is marked done in `localStorage` (`tcs-lead-approvals`, keyed by `batch_id` + lead `id`). That is device-only.
+
+3. If `APPROVAL_PROXY_URL` were ever empty, the page would show **Proxy not configured** and Accept/Skip would open a mailto to `allen.s.ruiz1@gmail.com` whose subject encodes `approve:` / `skip:` + lead id + name. Production builds use the committed Cloudflare URL, so this fallback should not appear.
+
+4. If the proxy URL is set but the POST fails, the card stays open so Allen can retry. It does **not** fall back to mailto (that would hide a broken proxy).
+
+POST body:
 
 ```json
 {
@@ -84,25 +111,37 @@ POST body (no secrets):
 }
 ```
 
-`action` is `approve` or `skip`.
+`action` is `approve` or `skip`. `business_name` and `batch_id` are included when present.
 
-Mailto subject:
+Mailto subject (only if the proxy URL is empty):
 
 ```
 approve: lead-001 Example Barbershop
 skip: lead-001 Example Barbershop
 ```
 
-## CoS: set the webhook
+The public config is `src/config/approval.js`:
 
-Chief of Staff sets `webhook_url` on the batch JSON to a CORS-friendly public endpoint (Formspree, Google Apps Script `doPost`, etc.). That value is **not a secret** — it is shipped in static JSON.
+```js
+export const APPROVAL_PROXY_URL =
+  process.env.NEXT_PUBLIC_APPROVAL_PROXY_URL ||
+  'https://authorized-philip-mechanics-rick.trycloudflare.com';
+```
 
-To use one URL for every batch instead, set the GitHub Actions **variable** `APPROVAL_WEBHOOK_URL` on this repo. Deploy inlines it as `NEXT_PUBLIC_APPROVAL_WEBHOOK_URL`. Per-batch `webhook_url` still wins when present.
+## CoS: wire the proxy
 
-Until a webhook is set, Accept / Skip opens the mailto fallback so Allen still gets the decision.
+The live proxy is the Cloudflare tunnel above. It must:
+
+- Allow CORS from `https://aruizdevelops.github.io`
+- Accept `POST /decision` with the JSON body above (no browser auth)
+- Forward that body to the **upstream** Cursor automation webhook, adding the sender key **only on the server** (never in this repo):
+
+  `https://api2.cursor.sh/automations/webhook/ed64d389-5927-5f88-ac53-ed47e40daeaf`
+
+Override the base URL with GitHub Actions variable `APPROVAL_PROXY_URL` if the tunnel host changes. Deploy inlines it as `NEXT_PUBLIC_APPROVAL_PROXY_URL`.
 
 Locally:
 
 ```
-NEXT_PUBLIC_APPROVAL_WEBHOOK_URL=https://formspree.io/f/xxxxxxxx
+NEXT_PUBLIC_APPROVAL_PROXY_URL=https://authorized-philip-mechanics-rick.trycloudflare.com
 ```

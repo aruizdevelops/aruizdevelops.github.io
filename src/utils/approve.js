@@ -1,3 +1,4 @@
+import { APPROVAL_PROXY_URL } from '../config/approval';
 import { buildMailto } from './mailto';
 
 export const APPROVE_NOTIFY_EMAIL = 'allen.s.ruiz1@gmail.com';
@@ -5,18 +6,24 @@ export const APPROVE_STORAGE_KEY = 'tcs-lead-approvals';
 export const APPROVE_BATCH_URL = '/approve/batch.json';
 
 const MAX_TEXT_LENGTH = 200;
+const ALLOWED_ACTIONS = new Set(['approve', 'skip', 'ping']);
 
-export function getApprovalWebhookUrl(batch) {
-  const fromBatch =
-    typeof batch?.webhook_url === 'string' ? batch.webhook_url.trim() : '';
-  if (isHttpUrl(fromBatch)) return fromBatch;
+export { APPROVAL_PROXY_URL };
 
-  const fromEnv = process.env.NEXT_PUBLIC_APPROVAL_WEBHOOK_URL;
-  if (typeof fromEnv === 'string' && isHttpUrl(fromEnv.trim())) {
-    return fromEnv.trim();
-  }
+export function getApprovalProxyUrl() {
+  const raw =
+    typeof APPROVAL_PROXY_URL === 'string' ? APPROVAL_PROXY_URL.trim() : '';
+  const base = raw.replace(/\/+$/, '');
+  return isHttpUrl(base) ? base : '';
+}
 
-  return '';
+export function getApprovalProxyEndpoint() {
+  const base = getApprovalProxyUrl();
+  return base ? `${base}/decision` : '';
+}
+
+export function isApprovalProxyConfigured() {
+  return Boolean(getApprovalProxyEndpoint());
 }
 
 function isHttpUrl(value) {
@@ -116,8 +123,9 @@ export function buildVerifyLinks(lead) {
 }
 
 export function buildDecisionPayload({ action, lead, batchId }) {
+  const verb = ALLOWED_ACTIONS.has(action) ? action : 'ping';
   return {
-    action,
+    action: verb,
     lead_id: sanitizeText(lead?.id, 80),
     business_name: sanitizeText(lead?.business_name, 120),
     batch_id: sanitizeText(batchId, 80),
@@ -126,7 +134,7 @@ export function buildDecisionPayload({ action, lead, batchId }) {
 
 export function buildDecisionMailto({ action, lead, batchId }) {
   const payload = buildDecisionPayload({ action, lead, batchId });
-  const verb = action === 'skip' ? 'skip' : 'approve';
+  const verb = payload.action === 'skip' ? 'skip' : 'approve';
   const subject = `${verb}: ${payload.lead_id} ${payload.business_name}`;
   const body = [
     `Action: ${verb}`,
@@ -176,6 +184,7 @@ export function storeLeadDecision({ batchId, leadId, action }) {
   const batchKey = sanitizeText(batchId, 80);
   const id = sanitizeText(leadId, 80);
   if (!batchKey || !id) return store;
+  if (action !== 'approve' && action !== 'skip') return store;
 
   const batch = {
     ...(store[batchKey] && typeof store[batchKey] === 'object'
@@ -193,16 +202,16 @@ export function storeLeadDecision({ batchId, leadId, action }) {
   return next;
 }
 
-export async function submitDecisionToWebhook(webhookUrl, payload) {
-  if (!webhookUrl) {
-    return { ok: false, reason: 'no-endpoint' };
+export async function postDecisionToProxy(payload) {
+  const endpoint = getApprovalProxyEndpoint();
+  if (!endpoint) {
+    return { ok: false, reason: 'proxy-not-configured' };
   }
 
   try {
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Accept: 'application/json',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -219,26 +228,59 @@ export function openMailto(href) {
 }
 
 export async function submitLeadDecision({ action, lead, batch }) {
+  if (action !== 'approve' && action !== 'skip') {
+    return {
+      store: readDecisionStore(),
+      recordedLocally: false,
+      submittedToProxy: false,
+      usedMailto: false,
+      mailtoHref: null,
+      reason: 'bad-action',
+    };
+  }
+
   const batchId = sanitizeText(batch?.batch_id, 80);
-  const nextStore = storeLeadDecision({
+  const payload = buildDecisionPayload({ action, lead, batchId });
+  const proxyConfigured = isApprovalProxyConfigured();
+
+  if (!proxyConfigured) {
+    const store = storeLeadDecision({
+      batchId,
+      leadId: lead?.id,
+      action,
+    });
+    return {
+      store,
+      recordedLocally: true,
+      submittedToProxy: false,
+      usedMailto: true,
+      mailtoHref: buildDecisionMailto({ action, lead, batchId }),
+      reason: 'proxy-not-configured',
+    };
+  }
+
+  const submission = await postDecisionToProxy(payload);
+  if (!submission.ok) {
+    return {
+      store: readDecisionStore(),
+      recordedLocally: false,
+      submittedToProxy: false,
+      usedMailto: false,
+      mailtoHref: null,
+      reason: submission.reason || 'proxy-failed',
+    };
+  }
+
+  const store = storeLeadDecision({
     batchId,
     leadId: lead?.id,
     action,
   });
-
-  const payload = buildDecisionPayload({ action, lead, batchId });
-  const webhookUrl = getApprovalWebhookUrl(batch);
-  const submission = await submitDecisionToWebhook(webhookUrl, payload);
-  const usedMailto = !submission.ok;
-  const mailtoHref = usedMailto
-    ? buildDecisionMailto({ action, lead, batchId })
-    : null;
-
   return {
-    store: nextStore,
+    store,
     recordedLocally: true,
-    submittedToWebhook: submission.ok,
-    usedMailto,
-    mailtoHref,
+    submittedToProxy: true,
+    usedMailto: false,
+    mailtoHref: null,
   };
 }
