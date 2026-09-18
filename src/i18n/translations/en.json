@@ -23,7 +23,7 @@
 
   "about.overline": "About Me",
   "about.headline": "Developer, Designer, Builder",
-  "about.description": "I'm Allen Ruiz, the developer behind Bluebonnet Tech. I specialize in building polished digital products that solve real business problems, from responsive web platforms to native mobile apps. I care about clean architecture, thoughtful design, and shipping work that makes a measurable difference for the people who use it.",
+  "about.description": "I'm Allen Ruiz, the developer behind Texas Craft Sites. I specialize in building polished digital products that solve real business problems, from responsive web platforms to native mobile apps. I care about clean architecture, thoughtful design, and shipping work that makes a measurable difference for the people who use it.",
   "about.highlight1": "Full stack web and mobile development",
   "about.highlight2": "UI/UX design with a business first mindset",
   "about.highlight3": "Component driven architecture for scalability",
@@ -45,7 +45,7 @@
 
   "work.overline": "Featured Work",
   "work.headline": "Projects",
-  "work.subtitle": "A selection of apps built with the Bluebonnet Tech platform, each one designed to solve a real business need.",
+  "work.subtitle": "A selection of apps built with the Texas Craft Sites platform, each one designed to solve a real business need.",
   "work.viewCaseStudy": "View Case Study",
   "work.comingSoon": "Live Demo Coming Soon",
 
@@ -53,9 +53,9 @@
   "projects.tropikala.summary": "A vibrant tropical smoothie shop with online menu browsing, shopping cart, promotions, and a full admin dashboard for business operations.",
   "projects.tropikala.appType": "Full Stack Web Application",
   "projects.tropikala.businessProblem": "Smoothie shops and small food and beverage businesses rely on foot traffic and lack a polished digital presence for menu browsing, online ordering, and business management.",
-  "projects.tropikala.overview": "Tropikala Smoothie Co. is a demo application showcasing a modern digital storefront for a tropical smoothie brand. It features a vibrant landing page, browsable menu with nutrition data, shopping cart, promotions system, and a complete admin dashboard, all built on the Bluebonnet Tech core platform.",
+  "projects.tropikala.overview": "Tropikala Smoothie Co. is a demo application showcasing a modern digital storefront for a tropical smoothie brand. It features a vibrant landing page, browsable menu with nutrition data, shopping cart, promotions system, and a complete admin dashboard, all built on the Texas Craft Sites core platform.",
   "projects.tropikala.challenge": "Building a full stack application that serves both customers and business operators equally well. The customer experience needed to feel fun, vibrant, and inviting, while the admin dashboard required powerful product, order, and promotion management without feeling overwhelming.",
-  "projects.tropikala.solution": "A dual experience tenant application built on the Bluebonnet Tech core. The customer side features a warm coral/teal palette with engaging product cards, category filtering, and a cart flow. The admin side provides order management, smoothie catalog editing, promotion tools, analytics, and media management.",
+  "projects.tropikala.solution": "A dual experience tenant application built on the Texas Craft Sites core. The customer side features a warm coral/teal palette with engaging product cards, category filtering, and a cart flow. The admin side provides order management, smoothie catalog editing, promotion tools, analytics, and media management.",
   "projects.tropikala.feature1": "Full product menu with category filtering and nutrition details",
   "projects.tropikala.feature2": "Shopping cart with real time item management",
   "projects.tropikala.feature3": "Admin dashboard with order tracking and analytics",
@@ -94,7 +94,7 @@
   "projects.ironoak.summary": "An upscale barbershop experience with an online booking system, service showcase, barber profiles, and a polished dark-mode design built for the modern gentleman.",
   "projects.ironoak.appType": "Full Stack Web Application",
   "projects.ironoak.businessProblem": "Traditional barbershops rely on walk-ins and phone calls, missing out on clients who expect to book online. Without a digital presence, they struggle to showcase their services, barbers, and brand identity to new customers.",
-  "projects.ironoak.overview": "Iron & Oak Barbershop is a demo application showcasing a premium digital presence for an upscale barbershop. It features a cinematic hero carousel, service menu with pricing, barber profiles, and a complete 3-step booking wizard, all wrapped in a sophisticated dark-mode design with gold accents built on the Bluebonnet Tech core platform.",
+  "projects.ironoak.overview": "Iron & Oak Barbershop is a demo application showcasing a premium digital presence for an upscale barbershop. It features a cinematic hero carousel, service menu with pricing, barber profiles, and a complete 3-step booking wizard, all wrapped in a sophisticated dark-mode design with gold accents built on the Texas Craft Sites core platform.",
   "projects.ironoak.challenge": "Creating a booking experience that feels as premium as the barbershop itself. The app needed to convey craftsmanship and tradition through its design while providing a modern, frictionless booking flow that guides customers from service selection through barber choice to appointment confirmation.",
   "projects.ironoak.solution": "A single-page application with a rich, immersive dark-mode aesthetic using gold accents and serif typography to evoke a classic gentleman's experience. The 3-step booking wizard walks customers through service selection, barber choice, date/time picking, and contact details with real-time validation and a polished confirmation screen.",
   "projects.ironoak.feature1": "Cinematic hero carousel with 5 professional barbershop images and auto-rotation",
@@ -189,7 +189,7 @@
   "footer.quickLinks": "Navigation",
   "footer.projectsTitle": "Projects",
   "footer.connectTitle": "Connect",
-  "footer.copyright": "© 2026 Bluebonnet Tech. All rights reserved.",
+  "footer.copyright": "© 2026 Texas Craft Sites. All rights reserved.",
   "footer.privacyPolicy": "Privacy Policy",
   "footer.termsOfService": "Terms of Service",
 

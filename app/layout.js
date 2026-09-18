@@ -10,11 +10,11 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'Bluebonnet Tech | Web & Mobile Development Portfolio',
+  title: 'Texas Craft Sites | Web & Mobile Development Portfolio',
   description:
-    'Bluebonnet Tech is the portfolio of Allen Ruiz, a UI/UX, web, and mobile developer building polished, business-ready digital products.',
+    'Texas Craft Sites is the portfolio of Allen Ruiz, a UI/UX, web, and mobile developer building polished, business-ready digital products.',
   openGraph: {
-    title: 'Bluebonnet Tech | Web & Mobile Development Portfolio',
+    title: 'Texas Craft Sites | Web & Mobile Development Portfolio',
     description:
       'UI/UX, web, and mobile development by Allen Ruiz. Polished digital products built for real businesses.',
     type: 'website',

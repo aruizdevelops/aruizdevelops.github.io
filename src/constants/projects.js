@@ -1,5 +1,5 @@
 /**
- * Project / case study data for the Bluebonnet Tech portfolio.
+ * Project / case study data for the Texas Craft Sites portfolio.
  * Each project maps to a tenant app built on the -core platform.
  * Text fields use translation keys — resolve via t() at render time.
  */

@@ -1,10 +1,10 @@
 /**
- * Tenant configuration for Bluebonnet Tech Portfolio.
+ * Tenant configuration for Texas Craft Sites Portfolio.
  * Dark "Midnight Indigo" theme — premium, tech-forward, steel blue + mint.
  */
 const tenantConfig = {
   id: 'portfolio',
-  name: 'Bluebonnet Tech',
+  name: 'Texas Craft Sites',
   logo: null,
   theme: {
     palette: {

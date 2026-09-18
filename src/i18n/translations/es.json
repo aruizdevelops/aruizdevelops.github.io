@@ -23,7 +23,7 @@
 
   "about.overline": "Sobre Mí",
   "about.headline": "Desarrollador, Diseñador, Constructor",
-  "about.description": "Soy Allen Ruiz, el desarrollador detrás de Bluebonnet Tech. Me especializo en construir productos digitales pulidos que resuelven problemas reales de negocios, desde plataformas web responsivas hasta aplicaciones móviles nativas. Me importa la arquitectura limpia, el diseño reflexivo y entregar trabajo que haga una diferencia medible.",
+  "about.description": "Soy Allen Ruiz, el desarrollador detrás de Texas Craft Sites. Me especializo en construir productos digitales pulidos que resuelven problemas reales de negocios, desde plataformas web responsivas hasta aplicaciones móviles nativas. Me importa la arquitectura limpia, el diseño reflexivo y entregar trabajo que haga una diferencia medible.",
   "about.highlight1": "Desarrollo web y móvil full stack",
   "about.highlight2": "Diseño UI/UX con mentalidad de negocio",
   "about.highlight3": "Arquitectura basada en componentes para escalabilidad",
@@ -45,7 +45,7 @@
 
   "work.overline": "Trabajo Destacado",
   "work.headline": "Proyectos",
-  "work.subtitle": "Una selección de aplicaciones construidas con la plataforma Bluebonnet Tech, cada una diseñada para resolver una necesidad real de negocio.",
+  "work.subtitle": "Una selección de aplicaciones construidas con la plataforma Texas Craft Sites, cada una diseñada para resolver una necesidad real de negocio.",
   "work.viewCaseStudy": "Ver Caso de Estudio",
   "work.comingSoon": "Demo en Vivo Próximamente",
 
@@ -53,9 +53,9 @@
   "projects.tropikala.summary": "Una vibrante tienda de smoothies tropicales con navegación de menú en línea, carrito de compras, promociones y un panel de administración completo para operaciones del negocio.",
   "projects.tropikala.appType": "Aplicación Web Full Stack",
   "projects.tropikala.businessProblem": "Las tiendas de smoothies y pequeños negocios de alimentos y bebidas dependen del tráfico peatonal y carecen de una presencia digital pulida para navegación de menú, pedidos en línea y gestión del negocio.",
-  "projects.tropikala.overview": "Tropikala Smoothie Co. es una aplicación demo que muestra una vitrina digital moderna para una marca de smoothies tropicales. Presenta una página de inicio vibrante, menú navegable con datos nutricionales, carrito de compras, sistema de promociones y un panel de administración completo, todo construido sobre la plataforma central de Bluebonnet Tech.",
+  "projects.tropikala.overview": "Tropikala Smoothie Co. es una aplicación demo que muestra una vitrina digital moderna para una marca de smoothies tropicales. Presenta una página de inicio vibrante, menú navegable con datos nutricionales, carrito de compras, sistema de promociones y un panel de administración completo, todo construido sobre la plataforma central de Texas Craft Sites.",
   "projects.tropikala.challenge": "Construir una aplicación full stack que sirva igualmente bien a clientes y operadores de negocio. La experiencia del cliente necesitaba sentirse divertida, vibrante y acogedora, mientras el panel de administración requería gestión potente de productos, pedidos y promociones sin sentirse abrumador.",
-  "projects.tropikala.solution": "Una aplicación tenant de experiencia dual construida sobre el core de Bluebonnet Tech. El lado del cliente presenta una paleta cálida coral/turquesa con tarjetas de productos atractivas, filtrado por categoría y flujo de carrito. El lado administrativo proporciona gestión de pedidos, edición de catálogo de smoothies, herramientas de promoción, analíticas y gestión de medios.",
+  "projects.tropikala.solution": "Una aplicación tenant de experiencia dual construida sobre el core de Texas Craft Sites. El lado del cliente presenta una paleta cálida coral/turquesa con tarjetas de productos atractivas, filtrado por categoría y flujo de carrito. El lado administrativo proporciona gestión de pedidos, edición de catálogo de smoothies, herramientas de promoción, analíticas y gestión de medios.",
   "projects.tropikala.feature1": "Menú completo de productos con filtrado por categoría y datos nutricionales",
   "projects.tropikala.feature2": "Carrito de compras con gestión de artículos en tiempo real",
   "projects.tropikala.feature3": "Panel de administración con seguimiento de pedidos y analíticas",
@@ -94,7 +94,7 @@
   "projects.ironoak.summary": "Una experiencia de barbería de alta gama con sistema de reservas en línea, exhibición de servicios, perfiles de barberos y un diseño elegante en modo oscuro construido para el caballero moderno.",
   "projects.ironoak.appType": "Aplicación Web Full Stack",
   "projects.ironoak.businessProblem": "Las barberías tradicionales dependen de visitas sin cita y llamadas telefónicas, perdiendo clientes que esperan reservar en línea. Sin presencia digital, les cuesta mostrar sus servicios, barberos e identidad de marca a nuevos clientes.",
-  "projects.ironoak.overview": "Iron & Oak Barbershop es una aplicación demo que muestra una presencia digital premium para una barbería de alta gama. Presenta un carrusel cinematográfico, menú de servicios con precios, perfiles de barberos y un asistente de reservas completo de 3 pasos, todo envuelto en un diseño sofisticado en modo oscuro con acentos dorados construido sobre la plataforma central de Bluebonnet Tech.",
+  "projects.ironoak.overview": "Iron & Oak Barbershop es una aplicación demo que muestra una presencia digital premium para una barbería de alta gama. Presenta un carrusel cinematográfico, menú de servicios con precios, perfiles de barberos y un asistente de reservas completo de 3 pasos, todo envuelto en un diseño sofisticado en modo oscuro con acentos dorados construido sobre la plataforma central de Texas Craft Sites.",
   "projects.ironoak.challenge": "Crear una experiencia de reservas que se sienta tan premium como la barbería misma. La app necesitaba transmitir artesanía y tradición a través de su diseño mientras proporcionaba un flujo de reservas moderno y sin fricciones que guiara a los clientes desde la selección del servicio hasta la confirmación de la cita.",
   "projects.ironoak.solution": "Una aplicación de página única con una estética inmersiva en modo oscuro usando acentos dorados y tipografía serif para evocar una experiencia clásica de caballero. El asistente de reservas de 3 pasos guía a los clientes a través de la selección de servicio, elección de barbero, selección de fecha/hora y datos de contacto con validación en tiempo real y una pantalla de confirmación pulida.",
   "projects.ironoak.feature1": "Carrusel cinematográfico con 5 imágenes profesionales de barbería y rotación automática",
@@ -189,7 +189,7 @@
   "footer.quickLinks": "Navegación",
   "footer.projectsTitle": "Proyectos",
   "footer.connectTitle": "Conectar",
-  "footer.copyright": "© 2026 Bluebonnet Tech. Todos los derechos reservados.",
+  "footer.copyright": "© 2026 Texas Craft Sites. Todos los derechos reservados.",
   "footer.privacyPolicy": "Política de Privacidad",
   "footer.termsOfService": "Términos de Servicio",
 
