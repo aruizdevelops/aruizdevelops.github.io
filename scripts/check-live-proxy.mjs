@@ -33,10 +33,13 @@ async function main() {
   );
   assert.deepEqual(publicBatch.leads, []);
 
-  const health = await getJson(`${PROXY}/`);
+  const health = await getJson(`${PROXY}/health`);
   assert.equal(health.status, 200);
   assert.equal(health.data.ok, true);
   assert.equal(health.data.webauthn, true);
+  assert.equal(typeof health.data.registration_open, 'boolean');
+  assert.equal(typeof health.data.credential_count, 'number');
+  assert.equal(typeof health.data.max_credentials, 'number');
 
   const batch = await getJson(`${PROXY}/batch`);
   assert.equal(batch.status, 401);
@@ -94,6 +97,8 @@ async function main() {
         proxy: PROXY,
         webauthn: health.data.webauthn,
         credential_count: health.data.credential_count,
+        max_credentials: health.data.max_credentials,
+        registration_open: health.data.registration_open,
         batch_unauthorized: batch.status === 401,
         register_options: options.status,
         rp_id: options.data.rp?.id,

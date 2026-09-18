@@ -18,7 +18,9 @@ Email Allen that link when a batch is ready. The page is an internal review UI (
 4. If the page still shows the lock screen, tap **Unlock with Face ID / Touch ID**.
 5. Lead cards load from the proxy. Accept / Skip as usual.
 
-Later visits: tap **Unlock with Face ID / Touch ID**. Do not publish leads on GitHub Pages.
+Later visits: tap **Unlock with Face ID / Touch ID**. The lock screen calls `GET {APPROVAL_PROXY_URL}/health`. If `registration_open` is `false` or `credential_count >= max_credentials`, **Register this device** is hidden — only Unlock is shown. Do not publish leads on GitHub Pages.
+
+If `GET /batch` or `POST /decision` returns **401** with `error: "batch_changed"` or `unauthorized`, the page clears the session token, returns to the lock screen, and prompts **Unlock with Face ID / Touch ID**. It does not auto-register.
 
 ## Security: static GitHub Pages cannot hide secrets or lead lists
 
@@ -141,7 +143,7 @@ On **Accept** or **Skip** (only after unlock):
 
 4. If `APPROVAL_PROXY_URL` were ever empty, the lock screen stays closed (leads cannot load) and the page would show that the proxy is not configured. Production builds use the committed Cloudflare URL.
 
-5. If the session expired (401/403), the page re-locks. If the proxy POST fails for another reason, the card stays open so Allen can retry.
+5. If the session expired or the batch changed (`401` `unauthorized` / `batch_changed`), the page clears the session and re-locks on Unlock. It does not auto-register. If the proxy POST fails for another reason, the card stays open so Allen can retry.
 
 Mailto subject (only if the proxy URL is empty — should not appear in production):
 
@@ -163,15 +165,16 @@ The live proxy is the Cloudflare tunnel above. It must:
 
   | Endpoint | Auth | Role |
   | --- | --- | --- |
-  | `POST /webauthn/register/options` | no | Create passkey options (platform authenticator, UV required). RP ID `aruizdevelops.github.io`. |
+  | `GET /health` | no | `{ registration_open, credential_count, max_credentials }`. Lock screen hides Register when enrollment is full. |
+  | `POST /webauthn/register/options` | no | Create passkey options (platform authenticator, UV required). RP ID `aruizdevelops.github.io`. `403` when enrollment is closed. |
   | `POST /webauthn/register/verify` | no | Verify attestation. First-time enroll of Allen’s device. |
   | `POST /webauthn/login/options` | no | Create assertion options. |
   | `POST /webauthn/login/verify` | no | Verify assertion. Return `{ "session_token": "..." }`. |
   | `GET /batch` | session | Return the current batch JSON. |
   | `POST /decision` | session | Accept/Skip body above; forward to Cursor **server-side** with the sender key. |
 
-- Reject `GET /batch` and `POST /decision` without a valid session.
-- Restrict passkey registration to Allen’s allowlist (do not let the public enroll a second account).
+- Reject `GET /batch` and `POST /decision` without a valid session (`401` `unauthorized`, or `401` `batch_changed` when the published batch has moved on).
+- Restrict passkey registration to Allen’s allowlist and cap (`max_credentials`). When full, `registration_open` is `false` and `POST /webauthn/register/options` returns `403`.
 
 Override the base URL with GitHub Actions variable `APPROVAL_PROXY_URL` if the tunnel host changes. Deploy inlines it as `NEXT_PUBLIC_APPROVAL_PROXY_URL`.
 

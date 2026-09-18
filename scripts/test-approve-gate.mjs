@@ -88,6 +88,16 @@ async function startStaticServer() {
 
 async function startMockProxy() {
   const decisions = [];
+  const state = {
+    registrationOpen: true,
+    credentialCount: 1,
+    maxCredentials: 2,
+    batchError: '',
+    registerCalls: 0,
+    loginCalls: 0,
+    healthCalls: 0,
+    batchCalls: 0,
+  };
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     if (req.method === 'OPTIONS') {
@@ -102,7 +112,25 @@ async function startMockProxy() {
     }
 
     try {
+      if (req.method === 'GET' && (url.pathname === '/health' || url.pathname === '/')) {
+        state.healthCalls += 1;
+        json(res, 200, {
+          ok: true,
+          service: 'tcs-approval-proxy',
+          webauthn: true,
+          credential_count: state.credentialCount,
+          max_credentials: state.maxCredentials,
+          registration_open: state.registrationOpen,
+        });
+        return;
+      }
+
       if (req.method === 'POST' && url.pathname === '/webauthn/register/options') {
+        state.registerCalls += 1;
+        if (!state.registrationOpen || state.credentialCount >= state.maxCredentials) {
+          json(res, 403, { error: 'registration_closed' });
+          return;
+        }
         json(res, 200, {
           challenge: b64url(randomBytes(32)),
           rp: { name: 'Texas Craft Sites', id: 'localhost' },
@@ -138,6 +166,7 @@ async function startMockProxy() {
       }
 
       if (req.method === 'POST' && url.pathname === '/webauthn/login/options') {
+        state.loginCalls += 1;
         json(res, 200, {
           challenge: b64url(randomBytes(32)),
           timeout: 60000,
@@ -158,6 +187,11 @@ async function startMockProxy() {
       }
 
       if (req.method === 'GET' && url.pathname === '/batch') {
+        state.batchCalls += 1;
+        if (state.batchError) {
+          json(res, 401, { ok: false, error: state.batchError });
+          return;
+        }
         if (sessionFrom(req) !== SESSION_TOKEN) {
           json(res, 401, { error: 'unauthorized' });
           return;
@@ -167,6 +201,10 @@ async function startMockProxy() {
       }
 
       if (req.method === 'POST' && url.pathname === '/decision') {
+        if (state.batchError) {
+          json(res, 401, { ok: false, error: state.batchError });
+          return;
+        }
         if (sessionFrom(req) !== SESSION_TOKEN) {
           json(res, 401, { error: 'unauthorized' });
           return;
@@ -184,12 +222,12 @@ async function startMockProxy() {
   });
 
   await new Promise((resolve) => server.listen(4174, '127.0.0.1', resolve));
-  return { server, decisions };
+  return { server, decisions, state };
 }
 
 async function main() {
   const staticProc = await startStaticServer();
-  const { server, decisions } = await startMockProxy();
+  const { server, decisions, state } = await startMockProxy();
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -200,7 +238,7 @@ async function main() {
   page.on('console', (msg) => logs.push(`${msg.type()}: ${msg.text()}`));
   page.on('pageerror', (err) => logs.push(`pageerror: ${err.message}`));
 
-  await page.route(`https://${PROXY_HOST}/**`, async (route) => {
+  await context.route(`https://${PROXY_HOST}/**`, async (route) => {
     const req = route.request();
     const target = req.url().replace(`https://${PROXY_HOST}`, 'http://127.0.0.1:4174');
     const headers = { ...req.headers() };
@@ -306,6 +344,67 @@ async function main() {
     await page.getByRole('button', { name: 'Unlock with Face ID / Touch ID' }).click();
     await page.waitForSelector('.approve-card', { timeout: 15000 });
     await shot('approve_unlocked_later_visit.png');
+
+    await page.getByRole('button', { name: 'Lock' }).click();
+    await page.waitForSelector('.approve-lock-title', { timeout: 5000 });
+    state.registrationOpen = false;
+    state.credentialCount = 2;
+    const registerCallsBeforeClosed = state.registerCalls;
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('.approve-lock-title', { timeout: 10000 });
+    const registerWhenFull = await page.getByRole('button', {
+      name: 'Register this device',
+    }).count();
+    const unlockWhenFull = await page.getByRole('button', {
+      name: 'Unlock with Face ID / Touch ID',
+    }).isVisible();
+    if (registerWhenFull !== 0) {
+      failures.push('Register still visible when enrollment is full');
+    }
+    if (!unlockWhenFull) {
+      failures.push('Unlock missing when enrollment is full');
+    }
+    if (state.registerCalls !== registerCallsBeforeClosed) {
+      failures.push('lock screen auto-posted register/options while enrollment is full');
+    }
+    if ((await page.locator('.approve-card').count()) !== 0) {
+      failures.push('cards visible on full-enrollment lock screen');
+    }
+    await shot('approve_lock_enrollment_full.png');
+
+    await page.getByRole('button', { name: 'Unlock with Face ID / Touch ID' }).click();
+    await page.waitForSelector('.approve-card', { timeout: 15000 });
+    const registerCallsBeforeChanged = state.registerCalls;
+    const loginCallsBeforeChanged = state.loginCalls;
+    state.batchError = 'batch_changed';
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('.approve-lock-title', { timeout: 10000 });
+    const changedCopy = (await page.locator('.approve-lock').textContent()) || '';
+    if (!/batch changed/i.test(changedCopy)) {
+      failures.push(`missing batch_changed prompt: ${changedCopy}`);
+    }
+    if (!/Unlock with Face ID/.test(changedCopy)) {
+      failures.push('batch_changed lock screen did not prompt Unlock');
+    }
+    if ((await page.getByRole('button', { name: 'Register this device' }).count()) !== 0) {
+      failures.push('Register shown after batch_changed');
+    }
+    if ((await page.locator('.approve-card').count()) !== 0) {
+      failures.push('cards still visible after batch_changed');
+    }
+    if (state.registerCalls !== registerCallsBeforeChanged) {
+      failures.push('batch_changed auto-registered');
+    }
+    if (state.loginCalls !== loginCallsBeforeChanged) {
+      failures.push('batch_changed auto-unlocked with Face ID');
+    }
+    const tokenAfterChanged = await page.evaluate(() =>
+      sessionStorage.getItem('tcs-approve-session'),
+    );
+    if (tokenAfterChanged) {
+      failures.push('session token still present after batch_changed');
+    }
+    await shot('approve_lock_batch_changed.png');
   } catch (error) {
     failures.push(String(error?.stack || error));
     if (logs.length) failures.push(`logs: ${logs.join(' | ')}`);
@@ -327,7 +426,7 @@ async function main() {
     for (const failure of failures) console.error(' -', failure);
     process.exit(1);
   }
-  console.log('PASS passkey gate enroll/unlock/batch/decision');
+  console.log('PASS passkey gate enroll/unlock/full-enrollment/batch_changed');
 }
 
 main().catch((error) => {
