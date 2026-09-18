@@ -7,7 +7,8 @@
  *   POST ${APPROVAL_PROXY_URL}/webauthn/register/verify
  *   POST ${APPROVAL_PROXY_URL}/webauthn/login/options
  *   POST ${APPROVAL_PROXY_URL}/webauthn/login/verify  → { session_token }
- *   GET  ${APPROVAL_PROXY_URL}/batch                 (session required)
+ *   GET  ${APPROVAL_PROXY_URL}/batch                 (session required; Email tab)
+ *   GET  ${APPROVAL_PROXY_URL}/call-queue            (session required; Call tab)
  *   POST ${APPROVAL_PROXY_URL}/decision              (session required)
  *
  * Session auth uses a short-lived token from WebAuthn login

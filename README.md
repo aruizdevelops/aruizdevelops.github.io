@@ -34,8 +34,8 @@ Allen reviews Scout batches on his phone at:
 https://aruizdevelops.github.io/approve/
 ```
 
-The page is passkey-gated. First visit (while enrollment is open): **Register this device** + Face ID / Touch ID. Later visits, or when enrollment is full: **Unlock with Face ID / Touch ID** only. Leads load from authenticated `GET {APPROVAL_PROXY_URL}/batch` after WebAuthn login. `public/approve/batch.json` is an empty placeholder — not the source of truth.
+The page is passkey-gated. First visit (while enrollment is open): **Register this device** + Face ID / Touch ID. Later visits, or when enrollment is full: **Unlock with Face ID / Touch ID** only. After WebAuthn login, **Email** loads authenticated `GET {APPROVAL_PROXY_URL}/batch` filtered to public-email shops. **Call** loads authenticated `GET {APPROVAL_PROXY_URL}/call-queue` with the same session headers — not a client-side `/batch` filter. `public/approve/batch.json` is an empty placeholder — not the source of truth.
 
-After unlock, **Email** and **Call** tabs split authenticated `GET /batch` client-side (this GitHub Pages site cannot read Scout’s box). Email (public email only) Accept/Skip POSTs `{action, lead_id, business_name, batch_id}`. Call (phone-only: has phone, no public email, not skip) POSTs `{action, lead_id, business_name, batch_id, callback_at?}` with `interested` | `callback` | `no_answer` | `bad_number` | `remove`. Scout’s ops list is `shared/local-web/call-queue.csv` on the box; Cos/proxy may serve it later. Session headers on both. The Cursor sender key never ships in this repo.
+Email Accept/Skip POSTs `{action, lead_id, business_name, batch_id}`. Call POSTs `{action, lead_id, business_name, batch_id, callback_at?}` with `interested` | `callback` | `no_answer` | `bad_number` | `remove`. Session headers on both. The Cursor sender key never ships in this repo.
 
 See [APPROVE.md](./APPROVE.md) for enroll steps, the JSON shape, POST body, and how decisions are recorded.
