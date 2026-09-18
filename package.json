@@ -7,6 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "test": "node --experimental-default-type=module --test src/utils/*.test.js",
+    "test:approve-gate": "node scripts/test-approve-gate.mjs",
     "capture-screenshots": "node scripts/capture-screenshots.js"
   },
   "dependencies": {
