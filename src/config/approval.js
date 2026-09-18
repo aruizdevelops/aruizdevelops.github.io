@@ -2,6 +2,7 @@
  * Public approval proxy base URL only.
  *
  * Browser calls:
+ *   GET  ${APPROVAL_PROXY_URL}/health                (registration_open, credential_count)
  *   POST ${APPROVAL_PROXY_URL}/webauthn/register/options
  *   POST ${APPROVAL_PROXY_URL}/webauthn/register/verify
  *   POST ${APPROVAL_PROXY_URL}/webauthn/login/options

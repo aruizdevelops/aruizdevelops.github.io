@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -9,13 +9,20 @@ import {
   assertPrivateBatchUrl,
   buildDecisionPayload,
   extractSessionToken,
+  fetchAuthenticatedBatch,
+  fetchEnrollmentStatus,
   getApprovalBatchEndpoint,
+  getApprovalHealthEndpoint,
   getApprovalProxyEndpoint,
   getApprovalProxyPath,
   getApprovalProxyUrl,
+  isRegistrationAvailable,
   normalizeBatch,
   proxyAuthErrorMessage,
   sessionHeaders,
+  sessionInvalidKind,
+  sessionInvalidMessage,
+  submitLeadDecision,
 } from './approve.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -31,8 +38,8 @@ describe('approval proxy paths', () => {
       'https://authorized-philip-mechanics-rick.trycloudflare.com',
     );
     assert.equal(
-      getApprovalBatchEndpoint(),
-      'https://authorized-philip-mechanics-rick.trycloudflare.com/batch',
+      getApprovalHealthEndpoint(),
+      'https://authorized-philip-mechanics-rick.trycloudflare.com/health',
     );
   });
 
@@ -154,6 +161,10 @@ describe('public batch.json placeholder', () => {
     assert.doesNotMatch(client, /\/approve\/batch\.json/);
     assert.doesNotMatch(utils, /export const APPROVE_BATCH_URL/);
     assert.match(utils, /fetchAuthenticatedBatch/);
+    assert.match(utils, /fetchEnrollmentStatus/);
+    assert.match(client, /canRegister/);
+    assert.match(client, /handleSessionInvalid/);
+    assert.doesNotMatch(client, /\/approve\/batch\.json/);
   });
 });
 
@@ -174,7 +185,157 @@ describe('live proxy error copy', () => {
         unauthorized: true,
         reason: 'unauthorized',
       }),
-      /not authorized/i,
+      /Unlock with Face ID/i,
     );
+    assert.match(
+      proxyAuthErrorMessage({
+        ok: false,
+        status: 401,
+        unauthorized: true,
+        reason: 'batch_changed',
+      }),
+      /batch changed/i,
+    );
+  });
+});
+
+describe('enrollment status', () => {
+  it('hides registration when closed or at the credential cap', () => {
+    assert.equal(
+      isRegistrationAvailable({
+        registration_open: true,
+        credential_count: 1,
+        max_credentials: 2,
+      }),
+      true,
+    );
+    assert.equal(
+      isRegistrationAvailable({
+        registration_open: false,
+        credential_count: 1,
+        max_credentials: 2,
+      }),
+      false,
+    );
+    assert.equal(
+      isRegistrationAvailable({
+        registration_open: true,
+        credential_count: 2,
+        max_credentials: 2,
+      }),
+      false,
+    );
+    assert.equal(
+      isRegistrationAvailable({
+        credential_count: 2,
+        max_credentials: 2,
+      }),
+      false,
+    );
+  });
+});
+
+describe('session invalidation', () => {
+  it('maps 401 batch_changed and unauthorized to Unlock, not Register', () => {
+    assert.equal(
+      sessionInvalidKind({
+        unauthorized: true,
+        status: 401,
+        reason: 'batch_changed',
+      }),
+      'batch_changed',
+    );
+    assert.equal(
+      sessionInvalidKind({
+        unauthorized: true,
+        status: 401,
+        data: { error: 'unauthorized' },
+      }),
+      'unauthorized',
+    );
+    assert.match(sessionInvalidMessage('batch_changed'), /batch changed/i);
+    assert.match(sessionInvalidMessage('unauthorized'), /Unlock with Face ID/i);
+    assert.doesNotMatch(sessionInvalidMessage('batch_changed'), /Register/i);
+    assert.doesNotMatch(sessionInvalidMessage('unauthorized'), /Register/i);
+  });
+});
+
+describe('proxy fetches', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function jsonResponse(status, body) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  it('reads GET /health and hides Register when enrollment is full', async () => {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), method: init?.method || 'GET' });
+      return jsonResponse(200, {
+        ok: true,
+        webauthn: true,
+        registration_open: false,
+        credential_count: 2,
+        max_credentials: 2,
+      });
+    };
+    const status = await fetchEnrollmentStatus();
+    assert.equal(status.ok, true);
+    assert.equal(status.source, 'health');
+    assert.equal(status.registrationAvailable, false);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /\/health$/);
+    assert.equal(calls[0].method, 'GET');
+  });
+
+  it('falls back to register/options 403 when health is missing', async () => {
+    globalThis.fetch = async (url) => {
+      const path = String(url);
+      if (path.endsWith('/webauthn/register/options')) {
+        return jsonResponse(403, { error: 'registration_closed' });
+      }
+      return jsonResponse(404, { error: 'not-found' });
+    };
+    const status = await fetchEnrollmentStatus();
+    assert.equal(status.ok, true);
+    assert.equal(status.source, 'register-options');
+    assert.equal(status.registrationAvailable, false);
+  });
+
+  it('treats GET /batch 401 batch_changed as a lock-screen session error', async () => {
+    globalThis.fetch = async (url) => {
+      assert.doesNotMatch(String(url), /batch\.json/);
+      return jsonResponse(401, { ok: false, error: 'batch_changed' });
+    };
+    const result = await fetchAuthenticatedBatch('sess-old');
+    assert.equal(result.ok, false);
+    assert.equal(result.unauthorized, true);
+    assert.equal(result.reason, 'batch_changed');
+    assert.equal(sessionInvalidKind(result), 'batch_changed');
+    assert.match(sessionInvalidMessage(sessionInvalidKind(result)), /Unlock/);
+  });
+
+  it('treats POST /decision 401 unauthorized as a session error', async () => {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(init.method, 'POST');
+      return jsonResponse(401, { ok: false, error: 'unauthorized' });
+    };
+    const result = await submitLeadDecision({
+      action: 'approve',
+      lead: { id: 'lead-001', business_name: 'Example' },
+      batch: { batch_id: '2026-09-19' },
+      token: 'sess-old',
+    });
+    assert.equal(result.unauthorized, true);
+    assert.equal(result.reason, 'unauthorized');
+    assert.equal(sessionInvalidKind(result), 'unauthorized');
+    assert.equal(result.recordedLocally, false);
   });
 });

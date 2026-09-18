@@ -40,6 +40,10 @@ export function getApprovalBatchEndpoint() {
   return getApprovalProxyPath('batch');
 }
 
+export function getApprovalHealthEndpoint() {
+  return getApprovalProxyPath('health');
+}
+
 export function isApprovalProxyConfigured() {
   return Boolean(getApprovalProxyUrl());
 }
@@ -296,6 +300,37 @@ async function parseJsonSafe(response) {
   }
 }
 
+function proxyResponse(response, data) {
+  const proxyError =
+    data && typeof data.error === 'string' ? data.error.trim() : '';
+  return {
+    ok: response.ok,
+    status: response.status,
+    data,
+    unauthorized: response.status === 401 || response.status === 403,
+    reason: response.ok ? undefined : proxyError || `http-${response.status}`,
+  };
+}
+
+export async function getApprovalJson(path, token) {
+  const url = getApprovalProxyPath(path);
+  if (!url) {
+    return { ok: false, reason: 'proxy-not-configured' };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: sessionHeaders(token, { json: false }),
+    });
+    const data = await parseJsonSafe(response);
+    return proxyResponse(response, data);
+  } catch {
+    return { ok: false, reason: 'network' };
+  }
+}
+
 export async function postApprovalJson(path, body, token) {
   const url = getApprovalProxyPath(path);
   if (!url) {
@@ -309,20 +344,115 @@ export async function postApprovalJson(path, body, token) {
       body: JSON.stringify(body ?? {}),
     });
     const data = await parseJsonSafe(response);
-    const proxyError =
-      data && typeof data.error === 'string' ? data.error.trim() : '';
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-      unauthorized: response.status === 401 || response.status === 403,
-      reason: response.ok
-        ? undefined
-        : proxyError || `http-${response.status}`,
-    };
+    return proxyResponse(response, data);
   } catch {
     return { ok: false, reason: 'network' };
   }
+}
+
+export function isRegistrationAvailable(health) {
+  if (!health || typeof health !== 'object') return true;
+  if (health.registration_open === false) return false;
+  const count = Number(health.credential_count);
+  const max = Number(health.max_credentials);
+  if (Number.isFinite(count) && Number.isFinite(max) && count >= max) {
+    return false;
+  }
+  return true;
+}
+
+function looksLikeHealth(data) {
+  return Boolean(
+    data &&
+      typeof data === 'object' &&
+      (typeof data.registration_open === 'boolean' ||
+        Number.isFinite(Number(data.credential_count)) ||
+        Number.isFinite(Number(data.max_credentials)) ||
+        data.webauthn === true),
+  );
+}
+
+export function parseEnrollmentHealth(data) {
+  const count = Number(data?.credential_count);
+  const max = Number(data?.max_credentials);
+  return {
+    registrationAvailable: isRegistrationAvailable(data),
+    registrationOpen: data?.registration_open !== false,
+    credentialCount: Number.isFinite(count) ? count : null,
+    maxCredentials: Number.isFinite(max) ? max : null,
+  };
+}
+
+export async function fetchEnrollmentStatus() {
+  const fromHealth = await getApprovalJson('health');
+  if (fromHealth.ok && looksLikeHealth(fromHealth.data)) {
+    return {
+      ok: true,
+      source: 'health',
+      ...parseEnrollmentHealth(fromHealth.data),
+      data: fromHealth.data,
+    };
+  }
+
+  const fromRoot = await getApprovalJson('');
+  if (fromRoot.ok && looksLikeHealth(fromRoot.data)) {
+    return {
+      ok: true,
+      source: 'root',
+      ...parseEnrollmentHealth(fromRoot.data),
+      data: fromRoot.data,
+    };
+  }
+
+  const options = await postApprovalJson('webauthn/register/options', {});
+  if (options.status === 403) {
+    return {
+      ok: true,
+      source: 'register-options',
+      registrationAvailable: false,
+      registrationOpen: false,
+      credentialCount: null,
+      maxCredentials: null,
+      reason: options.reason,
+    };
+  }
+
+  return {
+    ok: false,
+    source: 'unknown',
+    registrationAvailable: true,
+    registrationOpen: true,
+    credentialCount: null,
+    maxCredentials: null,
+    reason: fromHealth.reason || fromRoot.reason || options.reason,
+  };
+}
+
+export function sessionInvalidKind(result) {
+  if (!result) return '';
+  const error = String(
+    result.reason || result.error || result.data?.error || '',
+  );
+  const flagged =
+    Boolean(result.unauthorized) ||
+    result.status === 401 ||
+    result.status === 403 ||
+    /batch_changed/i.test(error) ||
+    /^unauthorized$/i.test(error);
+  if (!flagged) return '';
+  if (/batch_changed/i.test(error)) return 'batch_changed';
+  return 'unauthorized';
+}
+
+export function sessionInvalidMessage(kind) {
+  if (kind === 'batch_changed') {
+    return 'This batch changed. Unlock with Face ID / Touch ID to continue.';
+  }
+  return 'Unlock with Face ID / Touch ID to continue.';
+}
+
+export function isSessionInvalid(result) {
+  return Boolean(sessionInvalidKind(result));
 }
 
 export function normalizeBatch(data) {
@@ -373,12 +503,14 @@ export async function fetchAuthenticatedBatch(token) {
     });
     const data = await parseJsonSafe(response);
     if (response.status === 401 || response.status === 403) {
+      const proxyError =
+        data && typeof data.error === 'string' ? data.error.trim() : '';
       return {
         ok: false,
         status: response.status,
         unauthorized: true,
         data,
-        reason: 'unauthorized',
+        reason: proxyError || 'unauthorized',
       };
     }
     if (!response.ok) {
@@ -511,6 +643,9 @@ export function proxyAuthErrorMessage(result) {
   if (result.reason === 'webauthn-options-missing-challenge') {
     return 'The passkey service did not return a challenge. Try again in a moment.';
   }
+  if (/batch_changed/i.test(detail)) {
+    return sessionInvalidMessage('batch_changed');
+  }
   if (/no credentials registered/i.test(detail)) {
     return 'No passkey is registered yet. Tap Register this device, then Face ID / Touch ID.';
   }
@@ -523,8 +658,17 @@ export function proxyAuthErrorMessage(result) {
   if (result.status === 404) {
     return 'Passkey service is not ready on the proxy yet. Try again in a moment.';
   }
+  if (
+    result.status === 403 &&
+    (/register/i.test(detail) ||
+      /registration/i.test(detail) ||
+      /full/i.test(detail) ||
+      /closed/i.test(detail))
+  ) {
+    return 'Enrollment is full. Unlock with Face ID / Touch ID on Allen\'s enrolled phone.';
+  }
   if (result.unauthorized || /unauthorized/i.test(detail)) {
-    return 'This device is not authorized. Register this device, then unlock.';
+    return 'This device is not authorized. Unlock with Face ID / Touch ID on Allen\'s enrolled phone.';
   }
   if (result.reason === 'network') {
     return 'Could not reach the approval proxy. Try again.';
@@ -547,11 +691,8 @@ export async function postDecisionToProxy(payload, token) {
       headers: sessionHeaders(token, { json: true }),
       body: JSON.stringify(payload),
     });
-    return {
-      ok: response.ok,
-      status: response.status,
-      unauthorized: response.status === 401 || response.status === 403,
-    };
+    const data = await parseJsonSafe(response);
+    return proxyResponse(response, data);
   } catch {
     return { ok: false, reason: 'network' };
   }
@@ -605,6 +746,7 @@ export async function submitLeadDecision({ action, lead, batch, token }) {
       mailtoHref: null,
       unauthorized: Boolean(submission.unauthorized),
       reason: submission.reason || 'proxy-failed',
+      data: submission.data,
     };
   }
 

@@ -9,6 +9,7 @@ import {
   clearSessionToken,
   enrollDevice,
   fetchAuthenticatedBatch,
+  fetchEnrollmentStatus,
   formatBatchDate,
   formatCountLine,
   formatStatusLabel,
@@ -20,11 +21,14 @@ import {
   readDeviceEnrolled,
   readDecisionStore,
   readSessionToken,
+  sessionInvalidKind,
+  sessionInvalidMessage,
   statusTone,
   storeLeadDecision,
   submitLeadDecision,
   unlockDevice,
   webAuthnErrorMessage,
+  writeDeviceEnrolled,
 } from '../../src/utils/approve';
 import './approve.css';
 
@@ -155,6 +159,7 @@ function LeadCard({
 
 function LockPanel({
   enrolled,
+  canRegister,
   supported,
   proxyConfigured,
   busy,
@@ -162,7 +167,8 @@ function LockPanel({
   onUnlock,
   onRegister,
 }) {
-  const primaryIsRegister = !enrolled;
+  const showRegister = Boolean(canRegister);
+  const primaryIsRegister = showRegister && !enrolled;
   return (
     <div className="approve-lock">
       <div className="approve-lock-mark" aria-hidden="true">
@@ -184,7 +190,7 @@ function LockPanel({
       </div>
       <h2 className="approve-lock-title">Unlock with Face ID / Touch ID</h2>
       <p className="approve-lock-copy">
-        {enrolled
+        {enrolled || !showRegister
           ? "This batch stays locked until Allen's registered device confirms with a passkey."
           : 'First visit on this phone: register this device, then use Face ID or Touch ID to unlock.'}
       </p>
@@ -233,14 +239,16 @@ function LockPanel({
             >
               {busy ? 'Waiting for Face ID…' : 'Unlock with Face ID / Touch ID'}
             </button>
-            <button
-              type="button"
-              className="approve-btn approve-btn-unlock"
-              disabled={busy || !supported || !proxyConfigured}
-              onClick={onRegister}
-            >
-              Register this device
-            </button>
+            {showRegister ? (
+              <button
+                type="button"
+                className="approve-btn approve-btn-unlock"
+                disabled={busy || !supported || !proxyConfigured}
+                onClick={onRegister}
+              >
+                Register this device
+              </button>
+            ) : null}
           </>
         )}
       </div>
@@ -268,24 +276,25 @@ export default function ApproveClient() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState('');
   const [enrolled, setEnrolled] = useState(false);
+  const [canRegister, setCanRegister] = useState(true);
   const [supported, setSupported] = useState(true);
   const proxyConfigured = isApprovalProxyConfigured();
 
-  const lockScreen = () => {
+  const handleSessionInvalid = useCallback((result) => {
     clearSessionToken();
     setBatch(null);
     setLoadState('idle');
     setGate('locked');
-  };
+    setEnrolled(true);
+    writeDeviceEnrolled(true);
+    setAuthError(sessionInvalidMessage(sessionInvalidKind(result)));
+  }, []);
 
   const loadBatchWithToken = useCallback(async (token) => {
     setLoadState('loading');
     const result = await fetchAuthenticatedBatch(token);
     if (result.unauthorized) {
-      lockScreen();
-      setAuthError(
-        'Session expired. Unlock with Face ID / Touch ID to continue.',
-      );
+      handleSessionInvalid(result);
       return false;
     }
     if (!result.ok) {
@@ -299,7 +308,7 @@ export default function ApproveClient() {
     setLoadState('ready');
     setGate('open');
     return true;
-  }, []);
+  }, [handleSessionInvalid]);
 
   useEffect(() => {
     const previousBackground = document.body.style.backgroundColor;
@@ -317,16 +326,24 @@ export default function ApproveClient() {
     setEnrolled(readDeviceEnrolled());
 
     const token = readSessionToken();
-    if (!token) {
-      setGate('locked');
-      return;
-    }
-
     let cancelled = false;
     (async () => {
+      const status = await fetchEnrollmentStatus();
+      if (cancelled) return;
+      setCanRegister(Boolean(status.registrationAvailable));
+
+      if (!token) {
+        setGate('locked');
+        return;
+      }
+
       const result = await fetchAuthenticatedBatch(token);
       if (cancelled) return;
-      if (result.unauthorized || !result.ok) {
+      if (result.unauthorized) {
+        handleSessionInvalid(result);
+        return;
+      }
+      if (!result.ok) {
         clearSessionToken();
         setGate('locked');
         return;
@@ -340,7 +357,7 @@ export default function ApproveClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [handleSessionInvalid]);
 
   const leads = Array.isArray(batch?.leads) ? batch.leads : [];
   const batchId = batch?.batch_id || '';
@@ -370,6 +387,13 @@ export default function ApproveClient() {
       try {
         const result = mode === 'register' ? await enrollDevice() : await unlockDevice();
         if (!result.ok) {
+          if (
+            mode === 'register' &&
+            (result.status === 403 ||
+              /registration|full|closed/i.test(String(result.reason || '')))
+          ) {
+            setCanRegister(false);
+          }
           setAuthError(proxyAuthErrorMessage(result));
           return;
         }
@@ -409,10 +433,7 @@ export default function ApproveClient() {
           token: readSessionToken(),
         });
         if (result.unauthorized) {
-          lockScreen();
-          setAuthError(
-            'Session expired. Unlock with Face ID / Touch ID to continue.',
-          );
+          handleSessionInvalid(result);
           return;
         }
         setStore(result.store || readDecisionStore());
@@ -458,7 +479,7 @@ export default function ApproveClient() {
         setBusyId('');
       }
     },
-    [batch, busyId, store],
+    [batch, busyId, handleSessionInvalid, store],
   );
 
   const dateLabel = formatBatchDate(batch?.generated_at, batch?.batch_id);
@@ -502,7 +523,10 @@ export default function ApproveClient() {
                 type="button"
                 className="approve-lock-again"
                 onClick={() => {
-                  lockScreen();
+                  clearSessionToken();
+                  setBatch(null);
+                  setLoadState('idle');
+                  setGate('locked');
                   setAuthError('');
                 }}
               >
@@ -517,6 +541,7 @@ export default function ApproveClient() {
             ) : locked ? (
               <LockPanel
                 enrolled={enrolled}
+                canRegister={canRegister}
                 supported={supported}
                 proxyConfigured={proxyConfigured}
                 busy={authBusy}
