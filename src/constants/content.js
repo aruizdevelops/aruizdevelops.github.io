@@ -1,5 +1,5 @@
 /**
- * Content for the Bluebonnet Tech portfolio landing page.
+ * Content for the Texas Craft Sites portfolio landing page.
  * Each export returns the object shape that core components expect.
  */
 
@@ -14,7 +14,7 @@ function interpolate(template, values) {
 
 export function getNavigation(t) {
   return {
-    brand: 'Bluebonnet Tech',
+    brand: 'Texas Craft Sites',
     links: [
       { label: t('nav.about'), href: '/#about' },
       { label: t('nav.services'), href: '/#services' },
@@ -242,7 +242,7 @@ export function getCta(t) {
 
 export function getFooter(t) {
   return {
-    brand: 'Bluebonnet Tech',
+    brand: 'Texas Craft Sites',
     tagline: t('footer.tagline'),
     columns: [
       {
