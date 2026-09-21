@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PROXY_HOST = 'authorized-philip-mechanics-rick.trycloudflare.com';
+const PROXY_HOST = 'ecological-kings-notes-vsnet.trycloudflare.com';
 const SESSION_TOKEN = 'test-session-token-allen';
 const TEST_BATCH = {
   batch_id: 'e2e-internal',

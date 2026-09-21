@@ -37,23 +37,23 @@ describe('approval proxy paths', () => {
   it('is wired to the live CoS Cloudflare proxy', () => {
     assert.equal(
       getApprovalProxyUrl(),
-      'https://authorized-philip-mechanics-rick.trycloudflare.com',
+      'https://ecological-kings-notes-vsnet.trycloudflare.com',
     );
     assert.equal(
       APPROVAL_PROXY_URL,
-      'https://authorized-philip-mechanics-rick.trycloudflare.com',
+      'https://ecological-kings-notes-vsnet.trycloudflare.com',
     );
     assert.equal(
       getApprovalBatchEndpoint(),
-      'https://authorized-philip-mechanics-rick.trycloudflare.com/batch',
+      'https://ecological-kings-notes-vsnet.trycloudflare.com/batch',
     );
     assert.equal(
       getApprovalCallQueueEndpoint(),
-      'https://authorized-philip-mechanics-rick.trycloudflare.com/call-queue',
+      'https://ecological-kings-notes-vsnet.trycloudflare.com/call-queue',
     );
     assert.equal(
       getApprovalHealthEndpoint(),
-      'https://authorized-philip-mechanics-rick.trycloudflare.com/health',
+      'https://ecological-kings-notes-vsnet.trycloudflare.com/health',
     );
   });
 

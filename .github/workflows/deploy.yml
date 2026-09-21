@@ -50,7 +50,7 @@ jobs:
           NEXT_PUBLIC_UNSUBSCRIBE_ENDPOINT: ${{ vars.UNSUBSCRIBE_ENDPOINT }}
           # Public approval proxy base URL only. Never a sender key. Passkey
           # session tokens are issued by this host at runtime. See APPROVE.md.
-          NEXT_PUBLIC_APPROVAL_PROXY_URL: ${{ vars.APPROVAL_PROXY_URL || 'https://authorized-philip-mechanics-rick.trycloudflare.com' }}
+          NEXT_PUBLIC_APPROVAL_PROXY_URL: ${{ vars.APPROVAL_PROXY_URL || 'https://ecological-kings-notes-vsnet.trycloudflare.com' }}
         run: npm run build
 
       - name: Setup Pages
