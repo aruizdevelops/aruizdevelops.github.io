@@ -17,4 +17,4 @@
  */
 export const APPROVAL_PROXY_URL =
   process.env.NEXT_PUBLIC_APPROVAL_PROXY_URL ||
-  'https://authorized-philip-mechanics-rick.trycloudflare.com';
+  'https://ecological-kings-notes-vsnet.trycloudflare.com';

@@ -11,7 +11,7 @@ import { APPROVAL_PROXY_URL } from '../src/config/approval.js';
 import { toCreationOptions } from '../src/utils/webauthn.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PROXY = 'https://authorized-philip-mechanics-rick.trycloudflare.com';
+const PROXY = 'https://ecological-kings-notes-vsnet.trycloudflare.com';
 
 async function getJson(url, init) {
   const response = await fetch(url, init);
