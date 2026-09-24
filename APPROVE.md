@@ -140,7 +140,7 @@ On **Accept** or **Skip** on the **Email** tab, or a Call outcome (only after un
    Production default (committed in `src/config/approval.js`):
 
    ```
-   https://ecological-kings-notes-vsnet.trycloudflare.com/decision
+   https://strengthening-aside-coming-depot.trycloudflare.com/decision
    ```
 
    Headers: `Content-Type: application/json`, plus the WebAuthn session:
@@ -220,5 +220,5 @@ Override the base URL with GitHub Actions variable `APPROVAL_PROXY_URL` if the t
 Locally:
 
 ```
-NEXT_PUBLIC_APPROVAL_PROXY_URL=https://ecological-kings-notes-vsnet.trycloudflare.com
+NEXT_PUBLIC_APPROVAL_PROXY_URL=https://strengthening-aside-coming-depot.trycloudflare.com
 ```
